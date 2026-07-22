@@ -1,8 +1,16 @@
 #include <SFML/Audio.hpp>
 #include <SFML/Graphics.hpp>
 #include <vector>
-#include "Simplex.h"
+#include "Map.h"
 #include <iostream>
+#include <cstdint>
+#include <map>
+
+/*
+std::map<terrain, uint8_t[]> terrain_colors = {
+	{OCEAN, {0, 255, 0}},
+};
+*/
 
 int main(int argc, char** argv) {
 	const uint16_t width = 500;
@@ -16,13 +24,29 @@ int main(int argc, char** argv) {
 	
 	std::vector<uint8_t> pixels(width * height * 4);
 
-	Simplex simplex_grid(width, height, 0.05);
-	simplex_grid.simplexNoise();
+	Map game_map(width, height);
 
 	for (uint32_t i = 0; i < width * height; i += 1) {
-		pixels[(i * 4) + 0] = (int)(255 * simplex_grid.grid[i]);	
-		pixels[(i * 4) + 1] = (int)(255 * simplex_grid.grid[i]);	
-		pixels[(i * 4) + 2] = (int)(255 * simplex_grid.grid[i]);	
+		if (game_map.terrain_map[i] == OCEAN) {
+			pixels[(i * 4) + 0] = 0;	
+			pixels[(i * 4) + 1] = 0;	
+			pixels[(i * 4) + 2] = 255;
+		} 
+		else if (game_map.terrain_map[i] == SEA) {
+			pixels[(i * 4) + 0] = 40;	
+			pixels[(i * 4) + 1] = 40;	
+			pixels[(i * 4) + 2] = 200;
+		}
+		else if (game_map.terrain_map[i] == COASTAL) {
+			pixels[(i * 4) + 0] = 80;	
+			pixels[(i * 4) + 1] = 80;	
+			pixels[(i * 4) + 2] = 200;
+		}
+		else if (game_map.terrain_map[i] == DESERT) {
+			pixels[(i * 4) + 0] = 200;	
+			pixels[(i * 4) + 1] = 200;	
+			pixels[(i * 4) + 2] = 30;
+		}
 		pixels[(i * 4) + 3] = 255;
 	}
 

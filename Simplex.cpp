@@ -1,7 +1,7 @@
 #include "Simplex.h"
 #include <cstdint>
 #include <cmath>
-
+#include <ctime>
 #include <iostream>
 
 // Followed Procedure by Stefan Gustavson. 
@@ -41,10 +41,13 @@ void Simplex::simplexNoise() {
 	for (int i = 0; i < 512; i++)
 		perm[i] = p[i & 255];
 	
+	std::srand(std::time({}));
+
+	int offset = (int)(grid_width * grid_height * (rand() % 1000)/1000.0);
 	for (int x = 0; x < grid_width; x++) {
 		for (int y = 0; y < grid_height; y++) {
-			float xin = x * scale;
-			float yin = y * scale;
+			float xin = (x + offset) * scale;
+			float yin = (y + offset) * scale;
 	
 			float s = (xin + yin) * F;
 			int i = fastFloor(xin + s);

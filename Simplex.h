@@ -5,6 +5,10 @@
 #include <string>
 
 class Simplex {
+	private:
+		void simplexNoise();
+		float dotProduct(int8_t grad[], float x, float y);
+	
 	public:
 		int grid_width;
 		int grid_height;
@@ -18,12 +22,9 @@ class Simplex {
 			scale = input_scale;
 			
 			grid = new float[grid_width * grid_height];
+			simplexNoise();
 		}
 
-		void simplexNoise();
 		int fastFloor(float x);
-	
-	private:
-		float dotProduct(int8_t grad[], float x, float y);
 };
 #endif
