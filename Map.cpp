@@ -77,7 +77,7 @@ Map::Map(uint16_t input_width, uint16_t input_height, float land_factor, float m
 					terrain_map[i] = GRASSLAND;
 				continue;
 			}
-			if (temperature_map[i] < 20)
+			if (temperature_map[i] < 25)
 				terrain_map[i] = GRASSLAND;
 			else 
 				terrain_map[i] = JUNGLE;
