@@ -41,7 +41,7 @@ void Simplex::simplexNoise() {
 	for (int i = 0; i < 512; i++)
 		perm[i] = p[i & 255];
 	
-	std::srand(std::time({}));
+	std::srand(std::time({}) + seed_effect);
 
 	int offset = (int)(grid_width * grid_height * (rand() % 1000)/1000.0);
 	for (int x = 0; x < grid_width; x++) {
