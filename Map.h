@@ -29,6 +29,6 @@ class Map {
 
 		terrain* terrain_map;
 
-		Map(uint16_t input_width, uint16_t input_height, float land_factor = 0.3, float max_temp = 40, float min_temp = -30);
+		Map(uint16_t input_width, uint16_t input_height, float land_factor = 0.3, float max_temp = 40, float min_temp = -40);
 };
 #endif

@@ -1,0 +1,13 @@
+Game has:
+- Terrain
+- Civilizations
+- Cultures
+- Languages
+
+Has panels in the top left. Allows for different views.
+Views: Terrain Default, Land, Temperature, Rainfall,
+
+Bottom panel holds specific interactions with the current view.
+Right panel holds interactions and information with the current selection. If the current selection refers to multiple potential items than it has options to select from each.
+
+segfaults upon closing??

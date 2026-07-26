@@ -22,8 +22,8 @@ Map::Map(uint16_t input_width, uint16_t input_height, float land_factor, float m
 				* (max_temp - min_temp));
 			temp_temperature += ((30 * (0.5 + factor_temperature_map.grid[i])) - 30);
 			
-//			if (!land_map[i]) // Sea is colder
-//				temp_temperature = (temp_temperature + ((max_temp + min_temp) * 0.1))/1.2;
+			if (!land_map[i]) // Sea is colder
+				temp_temperature = (temp_temperature + ((max_temp + min_temp) * 0.5 * 1))/2;
 			
 			temperature_map[i] = temp_temperature;
 
