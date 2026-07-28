@@ -1,15 +1,17 @@
 #include <SFML/Audio.hpp>
 #include <SFML/Graphics.hpp>
 #include <vector>
-#include "Map.h"
-#include "UIElements.h"
 #include <iostream>
 #include <cstdint>
 #include <map>
 #include <tuple>
 #include <string>
-
 #include <vector>
+
+#include "Map.h"
+#include "UIElements.h"
+#include "World.h"
+#include "Civilization.h"
 
 std::map<terrain, std::tuple<uint8_t, uint8_t, uint8_t>> terrain_colors = {
 	{OCEAN, std::tuple(0, 0, 255)},
@@ -83,6 +85,7 @@ std::vector<uint8_t> base_map_pixels(map_width * map_height * 4);
 sf::Texture base_map_texture(sf::Vector2u(map_width, map_height));
 
 Map game_map(map_width, map_height);
+World game_world(game_map);
 
 bool right_panel_on = false;
 
@@ -185,6 +188,9 @@ std::vector<SelectionPanel> selection_panels = {};
 sf::CircleShape selected_option_circle(5.f);
 sf::CircleShape unselected_option_circle(5.f);
 
+SelectionPanel* this_panel;
+
+
 int main(int argc, char** argv) {
 	std::srand(std::time({}));
 	sf::Font font("media/arial.ttf");
@@ -232,27 +238,32 @@ int main(int argc, char** argv) {
 	left_panel.setOutlineThickness(3.f);
 	left_panel.setPosition({0.f, 0.f});
 
-	sf::RectangleShape right_panel({150.f, height - 150.f}); 
+	sf::RectangleShape right_panel({200.f, height - 150.f}); 
 	right_panel.setFillColor(sf::Color(100,100,100));
 	right_panel.setOutlineColor(sf::Color(200, 200, 200));
 	right_panel.setOutlineThickness(3.f);
-	right_panel.setPosition({width - 150.f, 0.f});
+	right_panel.setPosition({width - 200.f, 0.f});
 
 	// Will need to be more flexible in the future. 
-	SelectionPanel left_panel_selection(30, 30, "Map Type", {"Terrain", "Land", "Temperature", "Precipitation", "Elevation"}, font, 20, MAP_TYPE);		
+	SelectionPanel left_panel_selection(30, 30, "Map Type", {"Terrain", "Land", "Temperature", "Precipitation", "Elevation"}, font, 20, MAP_TYPE, RADIO);
 	selection_panels.push_back(left_panel_selection);
+	SelectionPanel civilization_selection(30, 330, "Show Layers", {"Cultures", "Societies"}, font, 20, MAP_LAYERS, MULTICHOICE, 1);		
+	selection_panels.push_back(civilization_selection);
 
 	while (window.isOpen()) {
 		sf::Vector2i mouse_position = sf::Mouse::getPosition(window);
         
 		while (const std::optional event = window.pollEvent())
         {
-            if (event->is<sf::Event::Closed>())
+            if (event->is<sf::Event::Closed>()) {
                 window.close();
-			else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
+				return 0;
+			} else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
         	{
-				if (keyPressed->scancode == sf::Keyboard::Scancode::Escape)
+				if (keyPressed->scancode == sf::Keyboard::Scancode::Escape) {
 					window.close();
+					return 0;
+				}
 			}
 			else if (const auto* resized = event->getIf<sf::Event::Resized>())
 			{
@@ -271,27 +282,31 @@ int main(int argc, char** argv) {
 				left_panel.setSize({200.f, height - 150.f});
 				left_panel.setPosition({0.f, 0.f});
 				
-				right_panel.setSize({150.f, height - 150.f});
-				right_panel.setPosition({(float) width - 150.f, 0.f});
+				right_panel.setSize({200.f, height - 150.f});
+				right_panel.setPosition({(float) width - 200.f, 0.f});
 				
 				bottom_text.setPosition({width - 140.f, 50.f});
 			}
 			else if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
 			{
-				if (mouse_position.x < 200.f) {
-					// Left Panel
-					// This will need to be made more consistent tomorrow. Maybe each selection panel has its own float rect for its bounds and it is seen if mouse is touching it? These might not only be on the left panel.
-					for (uint8_t this_panel_i = 0; this_panel_i < selection_panels.size(); this_panel_i++) {
-						for (uint8_t i = 0; i < selection_panels[this_panel_i].text_options_rects.size(); i++) {
-							if (selection_panels[this_panel_i].text_options_rects[i].contains({(float) mouse_position.x, (float) mouse_position.y})) {
-								selection_panels[this_panel_i].value = i;
-								clickOnPanel(selection_panels[this_panel_i].panel_id, i);
+				// Left Panel
+				// This will need to be made more consistent tomorrow. Maybe each selection panel has its own float rect for its bounds and it is seen if mouse is touching it? These might not only be on the left panel.
+				for (uint8_t this_panel_i = 0; this_panel_i < selection_panels.size(); this_panel_i++) {
+					SelectionPanel* this_panel = &(selection_panels[this_panel_i]);
+					if (this_panel->panel_rect.contains({(float) mouse_position.x, (float) mouse_position.y})) {
+						for (uint8_t i = 1; i < this_panel->text_options_rects.size(); i++) {
+							if (this_panel->text_options_rects[i].contains({(float) mouse_position.x, (float) mouse_position.y})) {
+								if (this_panel->panel_type == RADIO) 
+									this_panel->value = i - 1;
+								else if (this_panel->panel_type == MULTICHOICE)
+									this_panel->values[i - 1] = !this_panel->values[i - 1];
+								clickOnPanel(this_panel->panel_id, i - 1);
 								break;
 							}
 						}
 					}
-				} else {
-					
+				}
+				if (mouse_position.x > 200) {	
 					sf::Vector2f world_pos = window.mapPixelToCoords(mouse_position, view1);
 					if (world_pos.x < 0 || world_pos.x > map_width || world_pos.y < 0 || world_pos.y > map_height)
 						continue;
@@ -363,18 +378,25 @@ int main(int argc, char** argv) {
 		window.draw(left_panel);
 		
 		for (uint8_t this_panel_i = 0; this_panel_i < selection_panels.size(); this_panel_i++) {
-			SelectionPanel* this_panel = &selection_panels[this_panel_i];
+			this_panel = &selection_panels[this_panel_i];
 			
 			float current_left = this_panel->left;
 			float current_top = this_panel->top;
+		
+			float max_left = 0;
+			
+			this_panel->text_options_sprites[0]->setPosition({current_left, current_top});
 
-			for (uint8_t i = 0; i < this_panel->text_options_sprites.size(); i++) {
-				this_panel->text_options_sprites[i].setPosition({current_left + 20, current_top});
+			window.draw(*(this_panel->text_options_sprites[0]));
+			current_top += this_panel->text_options_rects[0].size.y + 10;
+
+			for (uint8_t i = 1; i < this_panel->text_options.size() + 1; i++) { // 0th text is the title.
+				this_panel->text_options_sprites[i]->setPosition({current_left + 20, current_top});
 				this_panel->text_options_rects[i].position = {current_left, current_top};
 				
 				float button_offset = this_panel->text_options_rects[i].size.y/2;
-
-				if (this_panel->value == i) {
+				
+				if ((this_panel->panel_type == RADIO && this_panel->value == i - 1) || (this_panel->panel_type == MULTICHOICE && this_panel->values[i - 1])) {
 					selected_option_circle.setPosition({current_left, current_top + button_offset});	
 					window.draw(selected_option_circle);
 				} else {
@@ -382,10 +404,16 @@ int main(int argc, char** argv) {
 					window.draw(unselected_option_circle);
 				}
 				
-				window.draw(this_panel->text_options_sprites[i]);
-				current_top += 30;
+				window.draw(*(this_panel->text_options_sprites[i]));
+				current_top += this_panel->text_options_rects[i].size.y + 10;
+				
+				if (this_panel->text_options_rects[i].size.x + 25 > max_left)
+					max_left = this_panel->text_options_rects[i].size.x + 25;
 			}
+			this_panel->panel_rect.size.x = max_left;
+			this_panel->panel_rect.size.y = current_top - this_panel->top;
 		}
+		
 
 		if (right_panel_on) {
 			window.draw(right_panel);

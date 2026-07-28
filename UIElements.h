@@ -14,6 +14,11 @@ enum ButtonID {
 	HEATMAP,
 };
 
+enum PanelType {
+	RADIO,
+	MULTICHOICE,
+};
+
 struct Button {
 	sf::Sprite* button_sprite;
 	sf::FloatRect* button_collision_box;
@@ -51,41 +56,31 @@ struct Button {
 
 enum selection_panel_id {
 	MAP_TYPE,
+	MAP_LAYERS,
 };
 
 struct SelectionPanel {
+	PanelType panel_type;
+
 	selection_panel_id panel_id;
 
 	std::string title;
 	std::vector<std::string> text_options;
 	
 	uint8_t value;
+	bool* values;
 	
-	std::vector<sf::Text> text_options_sprites = {};
-	std::vector<sf::FloatRect> text_options_rects = {};
+	float font_size;
 
+	sf::Text** text_options_sprites;
+	std::vector<sf::FloatRect> text_options_rects = {};
+	
 	float left;
 	float top;
+	
+	sf::FloatRect panel_rect;
 
-	SelectionPanel(float new_left, float new_top, std::string new_title, std::vector<std::string> input_options, sf::Font &used_font, int font_size, selection_panel_id new_panel_id, uint8_t default_value = 0) {
-		text_options = input_options;
-
-		for (std::string option : text_options) {
-			sf::Text this_text(used_font, option, font_size);
-			text_options_sprites.push_back(this_text);
-			
-			sf::FloatRect this_text_bounds = this_text.getGlobalBounds();
-			this_text_bounds.size.x += 20; // Increasing by 20 so clicks include option.
-			text_options_rects.push_back(this_text_bounds);
-		}
-		value = default_value;
-		title = new_title;
-		
-		left = new_left;
-		top = new_top;
-
-		panel_id = new_panel_id;
-	}
+	SelectionPanel(float new_left, float new_top, std::string new_title, std::vector<std::string> input_options, sf::Font &used_font, int new_font_size, selection_panel_id new_panel_id, PanelType new_panel_type, uint8_t default_value = 0); 
 };
 
 #endif
