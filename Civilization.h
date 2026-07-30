@@ -2,9 +2,30 @@
 #define CIVILIZATION_H
 
 #include <string>
+#include <cstdint>
+#include <vector>
+#include "Map.h"
+#include "Event.h"
+struct NameGenerator {
+
+};
 
 struct Civilization {
 	std::string name;
+	std::vector<uint32_t> owned_tiles;
+	std::tuple<uint8_t, uint8_t, uint8_t> color;
+
+	Civilization(std::string input_name, std::tuple<uint8_t, uint8_t, uint8_t> input_color) {
+		name = input_name;
+		color = input_color;
+	}
+
+	std::vector<GameEvent> addAdjTiles(Map* game_map, uint16_t seed_effect);
+};
+
+struct Culture {
+	std::string name;
+	NameGenerator* name_generator;
 };
 
 #endif

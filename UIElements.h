@@ -19,6 +19,13 @@ enum PanelType {
 	MULTICHOICE,
 };
 
+enum selection_panel_id {
+	MAP_TYPE,
+	MAP_LAYER,
+	MOD_CIV,
+	MOD_TERRAIN,
+};
+
 struct Button {
 	sf::Sprite* button_sprite;
 	sf::FloatRect* button_collision_box;
@@ -54,11 +61,6 @@ struct Button {
 	}
 };
 
-enum selection_panel_id {
-	MAP_TYPE,
-	MAP_LAYERS,
-};
-
 struct SelectionPanel {
 	PanelType panel_type;
 
@@ -80,7 +82,7 @@ struct SelectionPanel {
 	
 	sf::FloatRect panel_rect;
 
-	SelectionPanel(float new_left, float new_top, std::string new_title, std::vector<std::string> input_options, sf::Font &used_font, int new_font_size, selection_panel_id new_panel_id, PanelType new_panel_type, uint8_t default_value = 0); 
+	SelectionPanel(float new_left, float new_top, std::string new_title, std::vector<std::string> input_options, sf::Font &used_font, int new_font_size, selection_panel_id new_panel_id, PanelType new_panel_type, int16_t default_value = 0); 
 };
 
 #endif

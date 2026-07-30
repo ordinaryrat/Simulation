@@ -2,6 +2,9 @@
 #include "Simplex.h"
 
 Map::Map(uint16_t input_width, uint16_t input_height, float land_factor, float max_temp, float min_temp) {
+	width = input_width;
+	height = input_height;
+
 	land_map = new bool[input_width * input_height];
 	terrain_map = new terrain[input_width * input_height];
 	temperature_map = new float[input_width * input_height];

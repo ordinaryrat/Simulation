@@ -1,6 +1,6 @@
 #include "UIElements.h"
 
-SelectionPanel::SelectionPanel(float new_left, float new_top, std::string new_title, std::vector<std::string> input_options, sf::Font &used_font, int new_font_size, selection_panel_id new_panel_id, PanelType new_panel_type, uint8_t default_value) {
+SelectionPanel::SelectionPanel(float new_left, float new_top, std::string new_title, std::vector<std::string> input_options, sf::Font &used_font, int new_font_size, selection_panel_id new_panel_id, PanelType new_panel_type, int16_t default_value) {
 	text_options = input_options;
 	text_options_sprites = new sf::Text*[input_options.size() + 1];
 	
@@ -30,11 +30,15 @@ SelectionPanel::SelectionPanel(float new_left, float new_top, std::string new_ti
 		// this_text_bounds.position.y -= 2.5;
 		text_options_rects.push_back(this_text_bounds);
 
-		if (panel_type == MULTICHOICE)
-			values[i] = default_value == i;
-			
+		if (panel_type == MULTICHOICE) {
+			if (default_value != -1)
+				values[i] = default_value == i;
+			else
+				values[i] = false;
+		}
 	}
-	value = default_value;
+	if (panel_type == RADIO)
+		value = default_value;
 	
 	left = new_left;
 	top = new_top;
