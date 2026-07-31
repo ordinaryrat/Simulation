@@ -22,3 +22,5 @@ Add add society button. Options for customizing the society to be added. Added t
 These options depend on the current view.
 
 Due to the sheer expensiveness of trying to calculate all adjacents, only certain areas should be pre-seen to potentially be expanded upon.
+
+Current setup means two civs cannot have same name? Add like (1)?

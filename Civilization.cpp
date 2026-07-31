@@ -43,7 +43,7 @@ std::vector<GameEvent> Civilization::addAdjTiles(Map* game_map, uint16_t seed_ef
 		if (!found)
 			i++;
 	}
-
+	
 	uint16_t selected_option = rand() % temp_tiles.size();
 	
 	GameEvent new_event(LAND_TAKEN, temp_tiles[selected_option], name);

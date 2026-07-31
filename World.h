@@ -8,7 +8,7 @@
 
 struct World {
 	Map* game_map;
-	std::vector<Civilization> civilizations;
+	std::vector<Civilization*> civilizations;
 	
 	int date[3] = {0, 0, 0};
 	

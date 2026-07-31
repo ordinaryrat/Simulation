@@ -43,6 +43,11 @@ std::map<terrain, std::string> terrain_names = {
 	{TUNDRA, "Tundra"},
 };
 
+enum MouseState {
+	REGULAR,
+	MAP_ADD	
+};
+
 enum map_type {
 	TERRAIN,
 	LAND,
@@ -97,24 +102,9 @@ float MAX_SPEED = 10;
 sf::Texture button_hovered_overlay_texture("media/ButtonOverlay.png");
 sf::Sprite button_hovered_overlay(button_hovered_overlay_texture);
 
+sf::Texture add_to_map_texture("media/AddToMapButton.png");
 
-sf::Texture terrain_section_button_texture("media/TerrainButton.png");
-sf::Texture default_button_texture("media/TemplateButton.png");
-sf::Texture back_button_texture("media/TemplateButton.png");
-
-sf::Texture terrain_heatmap_button_texture("media/TerrainHeatButton.png");
-sf::Texture terrain_landmap_button_texture("media/TerrainLandButton.png");
-sf::Texture terrain_rainfallmap_button_texture("media/TerrainRainfallButton.png");
-sf::Texture terrain_terrainmap_button_texture("media/TerrainTerrainButton.png");
-
-Button terrain_section_button(terrain_section_button_texture, TERRAIN_SECTION);
-Button societies_section_button(default_button_texture, TERRAIN_SECTION);
-Button back_button(back_button_texture, BACK);
-
-Button heatmap_button(terrain_heatmap_button_texture, HEATMAP);
-Button landmap_button(terrain_landmap_button_texture, LANDMAP);
-Button rainfallmap_button(terrain_rainfallmap_button_texture, RAINFALLMAP);
-Button terrainmap_button(terrain_rainfallmap_button_texture, TERRAINMAP);
+Button add_to_map_button(add_to_map_texture, ADD_TO_MAP);
 
 uint16_t width = 600;
 uint16_t height = 600;
@@ -122,7 +112,7 @@ uint16_t height = 600;
 uint16_t map_width = 700;
 uint16_t map_height = 700;
 
-std::vector<Button> bottom_panel_buttons;
+std::vector<Button*> bottom_panel_buttons = {};
 std::vector<uint8_t> base_map_pixels(map_width * map_height * 4);
 std::vector<uint8_t> top_layer_pixels(map_width * map_height * 4);
 sf::Texture base_map_texture(sf::Vector2u(map_width, map_height));
@@ -131,14 +121,15 @@ sf::Texture top_layer_texture(sf::Vector2u(map_width, map_height));
 Map game_map(map_width, map_height);
 World game_world(game_map);
 
-Civilization new_civ("rat", {255, 0, 0});
-Civilization new_civ2("bat", {255, 255, 0});
+Civilization* new_civ = new Civilization("rat", {255, 0, 0});
+Civilization* new_civ2 = new Civilization("bat", {255, 255, 0});
 
 bool right_panel_on = false;
 	
 sf::Sprite base_map(base_map_texture);
 sf::Sprite top_layer_map(top_layer_texture);
 
+MouseState current_mouse_state = REGULAR;
 // We will probably need to seperate different pixel layers. Like one called base map and then a map for others.
 
 void loadBaseMap(map_type base_map_type = TERRAIN) {
@@ -200,7 +191,7 @@ void loadTopLayer(layer_type layer = CIVILIZATIONS) {
 		case CIVILIZATIONS: {
 			top_layer_pixels.assign(top_layer_pixels.size(), 0);
 			for (uint16_t i = 0; i < game_world.civilizations.size(); i++) {
-				Civilization* this_civ = &game_world.civilizations[i];
+				Civilization* this_civ = game_world.civilizations[i];
 				for (uint32_t owned_tile : this_civ->owned_tiles) {
 					top_layer_pixels[(owned_tile * 4) + 0] = std::get<0>(this_civ->color);
 					top_layer_pixels[(owned_tile * 4) + 1] = std::get<1>(this_civ->color);
@@ -212,61 +203,26 @@ void loadTopLayer(layer_type layer = CIVILIZATIONS) {
 	}
 }
 
-void loadMainButtons() {
-	terrain_section_button.setPosition(10.f, (float)height - 70);
-	societies_section_button.setPosition(110.f, (float)height - 70);
-
-	bottom_panel_buttons = {};
-	bottom_panel_buttons.push_back(terrain_section_button);
-	bottom_panel_buttons.push_back(societies_section_button);
-}
-
-void loadTerrainSectionButtons() {
-	back_button.setPosition(10.f, (float)height - 70);
-	terrainmap_button.setPosition(110.f, (float)height - 70);
-	landmap_button.setPosition(210.f, (float)height - 70);
-	heatmap_button.setPosition(310.f, (float)height - 70);
-	rainfallmap_button.setPosition(410.f, (float)height - 70);
-
-	bottom_panel_buttons = {};
-	bottom_panel_buttons.push_back(back_button);
-	bottom_panel_buttons.push_back(terrainmap_button);
-	bottom_panel_buttons.push_back(landmap_button);
-	bottom_panel_buttons.push_back(heatmap_button);
-	bottom_panel_buttons.push_back(rainfallmap_button);
-}
-
 void clickButton(ButtonID button_id) {
 	switch (button_id) {
-		case (TERRAIN_SECTION):
-			loadTerrainSectionButtons();
-			break;
-		case (BACK):
-			loadMainButtons();
+		case (ADD_TO_MAP):
+			current_mouse_state = MAP_ADD;
 			break;
 	}
 }
 
 uint8_t current_map_view = 0;
 uint8_t current_top_layer_view = 2;
+uint8_t current_modification_option = 0;
 
-std::vector<SelectionPanel> selection_panels = {};
+std::vector<SelectionPanel*> left_selection_panels = {};
+std::vector<SelectionPanel*> bottom_selection_panels = {};
+std::vector<SelectionPanel*>* selection_panels[2] = {&left_selection_panels, &bottom_selection_panels};
 
+SelectionPanel left_panel_selection(30, 30, "Map Type", {"Terrain", "Land", "Temperature", "Precipitation", "Elevation"}, font, 20, MAP_TYPE, RADIO);
+SelectionPanel civilization_selection(30, 220, "Base Layer", {"None", "Cultures", "Civilizations", "Religions", "Governments"}, font, 20, MAP_LAYER, RADIO, 2);		
 SelectionPanel modification_civ_panel(30, height - 140, "Modify Civilizations", {"Add Civilization", "Paint Borders", "Modify Civilization", "Remove Civilization"}, font, 20, MOD_CIV, RADIO);
 SelectionPanel modification_terrain_panel(30, height - 140, "Modify Terrain", {"Draw Land", "Modify Elevation", "Modify Heat", "Modify Precipitation"}, font, 20, MOD_TERRAIN, RADIO);
-
-void addPanel(std::vector<SelectionPanel>& selection_panels, SelectionPanel& new_panel) {
-	for (uint8_t i = 0; i < selection_panels.size(); i++) {
-		// This function being called implies a chnage so we are fine just deleting stuff.
-		if (selection_panels[i].title == "Modify Civilizations" || selection_panels[i].title == "Modify Terrain") {
-			selection_panels.erase(selection_panels.begin() + i);
-			i--;
-		}
-	}
-	// Note that this is a different object with a different memory address. May be a problem TODO.
-	new_panel.top = height - 140;
-	selection_panels.push_back(new_panel);
-}
 
 void clickOnPanel(selection_panel_id panel_id, uint8_t option_pressed) {
 	switch (panel_id) {
@@ -281,12 +237,24 @@ void clickOnPanel(selection_panel_id panel_id, uint8_t option_pressed) {
 			current_top_layer_view = option_pressed;
 			switch (static_cast<layer_type>(option_pressed)) {
 				case NONE:
-					addPanel(selection_panels, modification_terrain_panel);
+					bottom_selection_panels = {};
+					bottom_selection_panels.push_back(&modification_terrain_panel);
+					current_modification_option = modification_terrain_panel.value;
 					break;
 				case CIVILIZATIONS:
-					addPanel(selection_panels, modification_civ_panel);
+					bottom_selection_panels = {};
+					bottom_selection_panels.push_back(&modification_civ_panel);
+					current_modification_option = modification_civ_panel.value;
 					break;
 			}
+			break;
+		case (MOD_CIV):
+			current_modification_option = option_pressed;
+			current_mouse_state = MAP_ADD;
+			break;
+		case (MOD_TERRAIN):
+			current_modification_option = option_pressed;
+			current_mouse_state = MAP_ADD;
 			break;
 	}
 }
@@ -325,16 +293,21 @@ void processEvents(std::vector<GameEvent> events) {
 	}
 }
 
+const sf::Cursor crosshair_cursor = sf::Cursor::createFromSystem(sf::Cursor::Type::Cross).value();
+const sf::Cursor arrow_cursor = sf::Cursor::createFromSystem(sf::Cursor::Type::Arrow).value();
+MouseState drawn_mouse = REGULAR;
+
 int main(int argc, char** argv) {
 	std::srand(std::time({}));
 	
-	// TODO REMOVE
-	new_civ.owned_tiles.push_back(10000);
-	new_civ2.owned_tiles.push_back(50000);
-	game_world.civilizations.push_back(new_civ);
-	game_world.civilizations.push_back(new_civ2);
-	game_world.civ_look_up_table.insert({"rat", &new_civ});
-	game_world.civ_look_up_table.insert({"bat", &new_civ2});
+	// TODO REMOVE (this can be done when loading save game)?
+	new_civ->owned_tiles.push_back(10000);
+	new_civ2->owned_tiles.push_back(50000);
+	//game_world.civilizations.push_back(new_civ);
+	//game_world.civilizations.push_back(new_civ2);
+	game_world.civ_look_up_table.insert({"rat", new_civ});
+	game_world.civ_look_up_table.insert({"bat", new_civ2});
+	// END OF REMOVE
 
 	selected_option_circle.setFillColor({0, 0, 200});
 	unselected_option_circle.setFillColor({100, 100, 100});
@@ -400,11 +373,9 @@ int main(int argc, char** argv) {
 	time_speed_text.setPosition({width/2.f + 10.f, 10.f});
 
 	// Will need to be more flexible in the future. 
-	SelectionPanel left_panel_selection(30, 30, "Map Type", {"Terrain", "Land", "Temperature", "Precipitation", "Elevation"}, font, 20, MAP_TYPE, RADIO);
-	selection_panels.push_back(left_panel_selection);
-	SelectionPanel civilization_selection(30, 220, "Base Layer", {"None", "Cultures", "Civilizations", "Religions", "Governments"}, font, 20, MAP_LAYER, RADIO, 2);		
-	selection_panels.push_back(civilization_selection);
-	selection_panels.push_back(modification_civ_panel);
+	left_selection_panels.push_back(&left_panel_selection);
+	left_selection_panels.push_back(&civilization_selection);
+	bottom_selection_panels.push_back(&modification_civ_panel);
 
 	// LOADING CIV Layer Map 
 	loadTopLayer(CIVILIZATIONS);
@@ -412,10 +383,24 @@ int main(int argc, char** argv) {
 	top_layer_texture.update(top_layer_pixels.data());
 	top_layer_map.setTexture(top_layer_texture);
 	top_layer_map.setPosition({0, 0});
+	
+	// BUTTONS
+	add_to_map_button.setPosition(width - 60.f, height - 60.f);
+	bottom_panel_buttons.push_back(&add_to_map_button);
+	
+	sf::FloatRect left_panel_rect = left_panel.getGlobalBounds();
+	sf::FloatRect bottom_panel_rect = bottom_panel.getGlobalBounds();
+	sf::FloatRect right_panel_rect = right_panel.getGlobalBounds();
 
 	while (window.isOpen()) {
 		sf::Vector2i mouse_position = sf::Mouse::getPosition(window);
-        
+       	
+		sf::Vector2i top_left_pixel = window.mapCoordsToPixel({0.f, 0.f}, view1);
+		sf::Vector2i bottom_right_pixel = window.mapCoordsToPixel({(float) game_world.game_map->width, (float) game_world.game_map->height}, view1);
+		
+		map_bounds.position = {(float) top_left_pixel.x, (float) top_left_pixel.y};
+		map_bounds.size = {(float) (bottom_right_pixel.x - top_left_pixel.x), (float) (bottom_right_pixel.y - top_left_pixel.y)};
+
 		while (const std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>()) {
@@ -429,6 +414,7 @@ int main(int argc, char** argv) {
 			} else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
 				if (keyPressed->scancode == sf::Keyboard::Scancode::Escape) {
 					right_panel_on = false;
+					current_mouse_state = REGULAR;
 				} else if (keyPressed->scancode == sf::Keyboard::Scancode::Space) {
 					paused = !paused;	
 					date_advance_time = 0.f;
@@ -461,6 +447,15 @@ int main(int argc, char** argv) {
 				right_panel.setSize({200.f, height - 200.f});
 				right_panel.setPosition({(float) width - 200.f, 0.f});
 				
+				left_panel_rect.size = {200.f, height - 200.f};
+				left_panel_rect.position = {0.f, 0.f};
+				
+				bottom_panel_rect.size = {(float) width, 150.f};
+				bottom_panel_rect.position = {0.f, (float) height - 150.f};
+				
+				right_panel_rect.size = {200.f, height - 200.f};
+				right_panel_rect.position = {(float) width - 200.f, 0.f};
+
 				bottom_text.setPosition({width - 140.f, 50.f});
 				
 				date_panel.setPosition({width/2.f - 150.f, 0.f});
@@ -468,52 +463,68 @@ int main(int argc, char** argv) {
 				year_date_text.setPosition({width/2.f - 140.f, 10.f});
 				month_date_text.setPosition({width/2.f - 70.f, 10.f});
 				time_speed_text.setPosition({width/2.f + 10.f, 10.f});
-				
-				for (uint8_t i = 0; i < selection_panels.size(); i++) {
-					if (selection_panels[i].title == "Modify Civilizations" || selection_panels[i].title == "Modify Terrain") {
-						SelectionPanel* this_panel = &selection_panels[i];
-						this_panel->top = height - 140.f;
+
+				modification_civ_panel.top = height - 140.f;
+				modification_terrain_panel.top = height - 140.f;
+				modification_civ_panel.panel_rect.position.y = height - 140.f;
+				modification_civ_panel.panel_rect.position.y = height - 140.f;
+				/*for (std::vector<SelectionPanel*>* this_section : selection_panels) {
+					for (uint8_t this_panel_i = 0; this_panel_i < this_section->size(); this_panel_i++) {
+						SelectionPanel* this_panel = (*this_section)[this_panel_i];
+						if (this_panel->title == "Modify Civilizations" || this_panel->title == "Modify Terrain") {
+							this_panel->top = height - 140.f;
+						}
 					}
-				}
+				}*/
+				add_to_map_button.setPosition(width - 60.f, height - 60.f);
 			}
 			else if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && active_window)
 			{
-				// Left Panel
-				for (uint8_t this_panel_i = 0; this_panel_i < selection_panels.size(); this_panel_i++) {
-					SelectionPanel* this_panel = &(selection_panels[this_panel_i]);
-					if (rectContains(this_panel->panel_rect, mouse_position)) {
-						for (uint8_t i = 1; i < this_panel->text_options_rects.size(); i++) {
-							if (rectContains(this_panel->text_options_rects[i], mouse_position)) {
-								if (this_panel->panel_type == RADIO) 
-									this_panel->value = i - 1;
-								else if (this_panel->panel_type == MULTICHOICE)
-									this_panel->values[i - 1] = !this_panel->values[i - 1];
-								clickOnPanel(this_panel->panel_id, i - 1);
-								break;
+				for (std::vector<SelectionPanel*>* this_section : selection_panels) {
+					for (uint8_t this_panel_i = 0; this_panel_i < this_section->size(); this_panel_i++) {
+						SelectionPanel* this_panel = (*this_section)[this_panel_i];
+						if (rectContains(this_panel->panel_rect, mouse_position)) {
+							for (uint8_t i = 1; i < this_panel->text_options_rects.size(); i++) {
+								if (rectContains(this_panel->text_options_rects[i], mouse_position)) {
+									if (this_panel->panel_type == RADIO) 
+										this_panel->value = i - 1;
+									else if (this_panel->panel_type == MULTICHOICE)
+										this_panel->values[i - 1] = !this_panel->values[i - 1];
+									clickOnPanel(this_panel->panel_id, i - 1);
+									break;
+								}
 							}
 						}
 					}
 				}
-				if (mouse_position.x > 200) {	
-					sf::Vector2f world_pos = window.mapPixelToCoords(mouse_position, view1);
-					if (world_pos.x < 0 || world_pos.x > map_width || world_pos.y < 0 || world_pos.y > map_height)
-						continue;
-					int i = ((int)world_pos.y * map_width) + (int)world_pos.x;
-					std::string temp_build_string = "(" + std::to_string((int)world_pos.x) + ", " + std::to_string((int)world_pos.y) + ")" + "\nTerrain: " + terrain_names[game_map.terrain_map[i]];
-					right_panel_on = true;
-					
-					// Because of the expensiveness of this operation, we will probably want to have a massive lookup table instead. If it just stores int and pointer maybe not that large.
-					bool civ_found = false;
-					for (uint16_t l = 0; l < game_world.civilizations.size() && !civ_found; l++) {
-						Civilization* this_civ = &game_world.civilizations[l];
-						for (uint32_t tile : this_civ->owned_tiles) {
-							if (tile == i) {
-								temp_build_string += "\nOwner: " + this_civ->name;
-								break;
-							}
+		
+				for (uint8_t i = 0; i < bottom_panel_buttons.size(); i++) {
+					if (rectContains(*(bottom_panel_buttons[i]->button_collision_box), mouse_position)) {
+						clickButton(bottom_panel_buttons[i]->button_id);	
+					}
+				}
+				// TODO Here we got to distinguish between clicks on the three panels before looking at the map.
+				bool click_on_panel = false;
+				if (rectContains(left_panel_rect, mouse_position) || (right_panel_on && rectContains(right_panel_rect, mouse_position)) || rectContains(bottom_panel_rect, mouse_position))
+					click_on_panel = true;
+				else {
+					if (rectContains(map_bounds, mouse_position)) {
+						sf::Vector2f world_pos = window.mapPixelToCoords(mouse_position, view1);
+						if (world_pos.x < 0 || world_pos.x > map_width || world_pos.y < 0 || world_pos.y > map_height)
+							continue;
+						int i = ((int)world_pos.y * map_width) + (int)world_pos.x;
+						if (current_mouse_state == MAP_ADD) {	
+							std::string name = "bah";
+							Civilization* temp_civ = new Civilization(name, {255, 0, 0});
+							temp_civ->owned_tiles.push_back(i);
+
+							game_world.civilizations.push_back(temp_civ);
+							game_world.civ_look_up_table.insert({name, temp_civ});	
+							
+							processEvents({GameEvent(LAND_TAKEN, i, name)});
+							current_mouse_state = REGULAR;
 						}
 					}
-					bottom_text.setString(temp_build_string);
 				}
 			}
 			else if (const auto* mouseWheelScrolled = event->getIf<sf::Event::MouseWheelScrolled>())
@@ -586,6 +597,30 @@ int main(int argc, char** argv) {
 					map_y_accel = MAX_SPEED;
 				view1.move({0.f, map_y_accel});
 			}
+			if (mouse_position.x > 200 && rectContains(map_bounds, mouse_position)) {	
+				sf::Vector2f world_pos = window.mapPixelToCoords(mouse_position, view1);
+				if (world_pos.x < 0 || world_pos.x > map_width || world_pos.y < 0 || world_pos.y > map_height)
+					continue;
+				int i = ((int)world_pos.y * map_width) + (int)world_pos.x;
+				std::string temp_build_string = "(" + std::to_string((int)world_pos.x) + ", " + std::to_string((int)world_pos.y) + ")" + "\nTerrain: " + terrain_names[game_map.terrain_map[i]];
+				right_panel_on = true;
+				
+				// Because of the expensiveness of this operation, we will probably want to have a massive lookup table instead. If it just stores int and pointer maybe not that large.
+				/*bool civ_found = false;
+				for (uint16_t l = 0; l < game_world.civilizations.size() && !civ_found; l++) {
+					Civilization* this_civ = &game_world.civilizations[l];
+					for (uint32_t tile : this_civ->owned_tiles) {
+						if (tile == i) {
+							temp_build_string += "\nOwner: " + this_civ->name;
+							break;
+						}
+					}
+				}*/
+				bottom_text.setString(temp_build_string);
+			} else {
+				// TODO should be pinning mechanism if a point is clicked in normal mode.
+				right_panel_on = false;
+			}
 		}	
 		window.setView(view1);
 		window.draw(base_map);
@@ -604,52 +639,70 @@ int main(int argc, char** argv) {
 			window.draw(bottom_text);
 		}
 		window.draw(bottom_panel);
-
-		for (uint8_t this_panel_i = 0; this_panel_i < selection_panels.size(); this_panel_i++) {
-			this_panel = &selection_panels[this_panel_i];
-			
-			float current_left = this_panel->left;
-			float current_top = this_panel->top;
 		
-			float max_left = 0;
-			
-			this_panel->text_options_sprites[0]->setPosition({current_left, current_top});
-
-			window.draw(*(this_panel->text_options_sprites[0]));
-			current_top += this_panel->text_options_rects[0].size.y + 10;
-
-			for (uint8_t i = 1; i < this_panel->text_options.size() + 1; i++) { // 0th text is the title.
-				this_panel->text_options_sprites[i]->setPosition({current_left + 20, current_top});
-				this_panel->text_options_rects[i].position = {current_left, current_top};
-				
-				float button_offset = this_panel->text_options_rects[i].size.y/2;
-				
-				if ((this_panel->panel_type == RADIO && this_panel->value == i - 1) || (this_panel->panel_type == MULTICHOICE && this_panel->values[i - 1])) {
-					selected_option_circle.setPosition({current_left, current_top + button_offset});	
-					window.draw(selected_option_circle);
-				} else {
-					unselected_option_circle.setPosition({current_left, current_top + button_offset});	
-					window.draw(unselected_option_circle);
-				}
-				
-				window.draw(*(this_panel->text_options_sprites[i]));
-				current_top += this_panel->text_options_rects[i].size.y + 10;
-				
-				if (this_panel->text_options_rects[i].size.x + 25 > max_left)
-					max_left = this_panel->text_options_rects[i].size.x + 25;
+		if (current_mouse_state == MAP_ADD && rectContains(map_bounds, mouse_position)) {
+			if (drawn_mouse != MAP_ADD) {
+				window.setMouseCursor(crosshair_cursor);
+				drawn_mouse = MAP_ADD;
 			}
-			this_panel->panel_rect.size.x = max_left;
-			this_panel->panel_rect.size.y = current_top - this_panel->top;
+		} else {
+			if (drawn_mouse != REGULAR) {
+				window.setMouseCursor(arrow_cursor);
+				drawn_mouse = REGULAR;
+			}
 		}
-		
-		for (uint8_t i = 0; i < bottom_panel_buttons.size(); i++) {
-			bottom_panel_buttons[i].button_sprite->setPosition({bottom_panel_buttons[i].pos_x, bottom_panel_buttons[i].pos_y});
-			window.draw(*(bottom_panel_buttons[i].button_sprite));
-		
-			if (rectContains(*(bottom_panel_buttons[i].button_collision_box), mouse_position)) {
-				button_hovered_overlay.setPosition({bottom_panel_buttons[i].pos_x, bottom_panel_buttons[i].pos_y});
-				window.draw(button_hovered_overlay);	
+
+		for (std::vector<SelectionPanel*>* this_section : selection_panels) {
+			for (uint8_t this_panel_i = 0; this_panel_i < this_section->size(); this_panel_i++) {
+				this_panel = (*this_section)[this_panel_i];
+				
+				float current_left = this_panel->left;
+				float current_top = this_panel->top;
+			
+				float max_left = 0;
+				
+				this_panel->text_options_sprites[0]->setPosition({current_left, current_top});
+
+				window.draw(*(this_panel->text_options_sprites[0]));
+				current_top += this_panel->text_options_rects[0].size.y + 10;
+
+				for (uint8_t i = 1; i < this_panel->text_options.size() + 1; i++) { // 0th text is the title.
+					this_panel->text_options_sprites[i]->setPosition({current_left + 20, current_top});
+					this_panel->text_options_rects[i].position = {current_left, current_top};
+					
+					if (rectContains(this_panel->text_options_rects[i], mouse_position))
+						this_panel->text_options_sprites[i]->setFillColor({200, 200, 200, 255});
+					else 
+						this_panel->text_options_sprites[i]->setFillColor({255, 255, 255, 255});
+					
+					float button_offset = this_panel->text_options_rects[i].size.y/2;
+					
+					if ((this_panel->panel_type == RADIO && this_panel->value == i - 1) || (this_panel->panel_type == MULTICHOICE && this_panel->values[i - 1])) {
+						selected_option_circle.setPosition({current_left, current_top + button_offset});	
+						window.draw(selected_option_circle);
+					} else {
+						unselected_option_circle.setPosition({current_left, current_top + button_offset});	
+						window.draw(unselected_option_circle);
+					}
+					
+					window.draw(*(this_panel->text_options_sprites[i]));
+					current_top += this_panel->text_options_rects[i].size.y + 10;
+					
+					if (this_panel->text_options_rects[i].size.x + 25 > max_left)
+						max_left = this_panel->text_options_rects[i].size.x + 25;
+				}
+				this_panel->panel_rect.size.x = max_left;
+				this_panel->panel_rect.size.y = current_top - this_panel->top;
 			}
+		}
+		for (uint8_t i = 0; i < bottom_panel_buttons.size(); i++) {
+			if (rectContains(*(bottom_panel_buttons[i]->button_collision_box), mouse_position))
+				bottom_panel_buttons[i]->button_sprite->setColor({200, 200, 200, 255});
+			else 
+				bottom_panel_buttons[i]->button_sprite->setColor({255, 255, 255, 255});
+
+			bottom_panel_buttons[i]->button_sprite->setPosition({bottom_panel_buttons[i]->left, bottom_panel_buttons[i]->top});
+			window.draw(*(bottom_panel_buttons[i]->button_sprite));
 		}
 		
 		window.display();

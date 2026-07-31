@@ -9,7 +9,7 @@ std::vector<GameEvent> World::incrementDate() {
 		date[1] = 0;
 	}
 	for (uint16_t i = 0; i < civilizations.size(); i++) {
-		std::vector<GameEvent> civ_events = civilizations[i].addAdjTiles(game_map, i);
+		std::vector<GameEvent> civ_events = civilizations[i]->addAdjTiles(game_map, i);
 		return_events.insert(return_events.end(), civ_events.begin(), civ_events.end());
 	}
 
