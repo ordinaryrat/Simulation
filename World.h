@@ -19,6 +19,8 @@ struct World {
 	std::vector<GameEvent> incrementDate(); 
 	
 	std::map<std::string, Civilization*> civ_look_up_table = {};
+
+	std::map<uint32_t, Civilization*> tiles_look_up_table = {};
 };
 
 #endif

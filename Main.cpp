@@ -224,6 +224,13 @@ SelectionPanel civilization_selection(30, 220, "Base Layer", {"None", "Cultures"
 SelectionPanel modification_civ_panel(30, height - 140, "Modify Civilizations", {"Add Civilization", "Paint Borders", "Modify Civilization", "Remove Civilization"}, font, 20, MOD_CIV, RADIO);
 SelectionPanel modification_terrain_panel(30, height - 140, "Modify Terrain", {"Draw Land", "Modify Elevation", "Modify Heat", "Modify Precipitation"}, font, 20, MOD_TERRAIN, RADIO);
 
+InputField civilization_name_field(font, 300, height - 80, 100, 20, "Name");
+
+std::vector<InputField*> modification_input_fields = {};
+std::vector<InputField*>* input_fields[1] = {&modification_input_fields};
+
+InputField* currently_selected_input_field = NULL;
+
 void clickOnPanel(selection_panel_id panel_id, uint8_t option_pressed) {
 	switch (panel_id) {
 		case (MAP_TYPE):
@@ -276,14 +283,15 @@ void processEvents(std::vector<GameEvent> events) {
 	for (GameEvent event : events) {
 		switch (event.type) {
 			case (LAND_TAKEN): {
+				Civilization* related_civ = game_world.civ_look_up_table[event.related_civ_name];
 				if (current_top_layer_view == 2) {
-					Civilization* related_civ = game_world.civ_look_up_table[event.related_civ_name];
 					top_layer_pixels[(event.para1 * 4) + 0] = std::get<0>(related_civ->color);
 					top_layer_pixels[(event.para1 * 4) + 1] = std::get<1>(related_civ->color);
 					top_layer_pixels[(event.para1 * 4) + 2] = std::get<2>(related_civ->color);
 					top_layer_pixels[(event.para1 * 4) + 3] = 160;
 					update_top_layer_texture = true;
 				}
+				game_world.tiles_look_up_table.insert({event.para1, related_civ});
 			}
 		}
 	}
@@ -392,6 +400,9 @@ int main(int argc, char** argv) {
 	sf::FloatRect bottom_panel_rect = bottom_panel.getGlobalBounds();
 	sf::FloatRect right_panel_rect = right_panel.getGlobalBounds();
 
+	// INPUT FIELD
+	modification_input_fields.push_back(&civilization_name_field);
+
 	while (window.isOpen()) {
 		sf::Vector2i mouse_position = sf::Mouse::getPosition(window);
        	
@@ -411,23 +422,34 @@ int main(int argc, char** argv) {
 				active_window = false;
 			} else if (event->is<sf::Event::FocusGained>()) {
 				active_window = true;
-			} else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-				if (keyPressed->scancode == sf::Keyboard::Scancode::Escape) {
-					right_panel_on = false;
-					current_mouse_state = REGULAR;
-				} else if (keyPressed->scancode == sf::Keyboard::Scancode::Space) {
-					paused = !paused;	
-					date_advance_time = 0.f;
-				} else if (keyPressed->scancode == sf::Keyboard::Scancode::P) {
-					paused = true;	
-					date_advance_time = 0.f;
-				} else if (keyPressed->scancode == sf::Keyboard::Scancode::NumpadPlus || keyPressed->scancode == sf::Keyboard::Scancode::Equal) {
-					time_until_date_advance /= 2;
-				} else if (keyPressed->scancode == sf::Keyboard::Scancode::NumpadMinus || keyPressed->scancode == sf::Keyboard::Scancode::Hyphen) {
-					time_until_date_advance *= 2;
+			} 
+			if (currently_selected_input_field != NULL) { 
+				if (const auto* text_entered = event->getIf<sf::Event::TextEntered>()) {
+					currently_selected_input_field->value += text_entered->unicode;
+					currently_selected_input_field->setInputText();
+				}	
+			} else {
+				if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+					if (keyPressed->scancode == sf::Keyboard::Scancode::Escape) {
+						right_panel_on = false;
+						current_mouse_state = REGULAR;
+						if (currently_selected_input_field != NULL)
+							currently_selected_input_field->selected = false;
+						currently_selected_input_field = NULL;
+					} else if (keyPressed->scancode == sf::Keyboard::Scancode::Space) {
+						paused = !paused;	
+						date_advance_time = 0.f;
+					} else if (keyPressed->scancode == sf::Keyboard::Scancode::P) {
+						paused = true;	
+						date_advance_time = 0.f;
+					} else if (keyPressed->scancode == sf::Keyboard::Scancode::NumpadPlus || keyPressed->scancode == sf::Keyboard::Scancode::Equal) {
+						time_until_date_advance /= 2;
+					} else if (keyPressed->scancode == sf::Keyboard::Scancode::NumpadMinus || keyPressed->scancode == sf::Keyboard::Scancode::Hyphen) {
+						time_until_date_advance *= 2;
+					}
 				}
 			}
-			else if (const auto* resized = event->getIf<sf::Event::Resized>())
+			if (const auto* resized = event->getIf<sf::Event::Resized>())
 			{
 				sf::Vector2u new_size = resized->size;
 				width = new_size.x;
@@ -477,6 +499,9 @@ int main(int argc, char** argv) {
 					}
 				}*/
 				add_to_map_button.setPosition(width - 60.f, height - 60.f);
+
+				civilization_name_field.top = height - 80.f;
+				civilization_name_field.input_field_rect.position.y = height - 80.f;
 			}
 			else if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && active_window)
 			{
@@ -503,11 +528,27 @@ int main(int argc, char** argv) {
 						clickButton(bottom_panel_buttons[i]->button_id);	
 					}
 				}
-				// TODO Here we got to distinguish between clicks on the three panels before looking at the map.
 				bool click_on_panel = false;
-				if (rectContains(left_panel_rect, mouse_position) || (right_panel_on && rectContains(right_panel_rect, mouse_position)) || rectContains(bottom_panel_rect, mouse_position))
+				bool click_on_input_field = false;
+				if (rectContains(left_panel_rect, mouse_position) || (right_panel_on && rectContains(right_panel_rect, mouse_position)) || rectContains(bottom_panel_rect, mouse_position)) {
+					// Always assuming input fields appear on these panels.
 					click_on_panel = true;
-				else {
+					for (std::vector<InputField*>* this_section : input_fields) {
+						for (uint8_t i = 0; i < this_section->size(); i++) {
+							InputField* this_input_field = (*this_section)[i];
+							if (rectContains(this_input_field->input_field_rect, mouse_position)) {
+								if (currently_selected_input_field != NULL) {
+									currently_selected_input_field->selected = false;
+									currently_selected_input_field = NULL;
+								}									
+								currently_selected_input_field = this_input_field;
+								currently_selected_input_field->selected = true;
+								click_on_input_field = true;
+								break;
+							}
+						}
+					}	
+				} else {
 					if (rectContains(map_bounds, mouse_position)) {
 						sf::Vector2f world_pos = window.mapPixelToCoords(mouse_position, view1);
 						if (world_pos.x < 0 || world_pos.x > map_width || world_pos.y < 0 || world_pos.y > map_height)
@@ -525,6 +566,12 @@ int main(int argc, char** argv) {
 							current_mouse_state = REGULAR;
 						}
 					}
+				}
+				if (!click_on_input_field) {
+					if (currently_selected_input_field != NULL) {
+						currently_selected_input_field->selected = false;
+						currently_selected_input_field = NULL;
+					}									
 				}
 			}
 			else if (const auto* mouseWheelScrolled = event->getIf<sf::Event::MouseWheelScrolled>())
@@ -561,43 +608,46 @@ int main(int argc, char** argv) {
 			time_speed_text.setString(formatSigFigs(std::to_string(2.f/time_until_date_advance)) + 'x');
         window.clear();
         if (active_window) {
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::D))
-			{
-				if (map_x_accel < 0)
-					map_x_accel = INITIAL_SPEED;
-				map_x_accel += ACCEL_RATE;
-				if (map_x_accel > MAX_SPEED)
-					map_x_accel = MAX_SPEED;
-				view1.move({map_x_accel, 0.f});
+			if (currently_selected_input_field == NULL) {
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::D))
+				{
+					if (map_x_accel < 0)
+						map_x_accel = INITIAL_SPEED;
+					map_x_accel += ACCEL_RATE;
+					if (map_x_accel > MAX_SPEED)
+						map_x_accel = MAX_SPEED;
+					view1.move({map_x_accel, 0.f});
+				}
+				else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::A))
+				{
+					if (map_x_accel > 0)
+						map_x_accel = -INITIAL_SPEED;
+					map_x_accel -= ACCEL_RATE;
+					if (-map_x_accel > MAX_SPEED)
+						map_x_accel = -MAX_SPEED;
+					view1.move({map_x_accel, 0.f});
+				}
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Up) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::W))
+				{
+					if (map_y_accel > 0)
+						map_y_accel = -INITIAL_SPEED;
+					map_y_accel -= ACCEL_RATE;
+					if (-map_y_accel > MAX_SPEED)
+						map_y_accel = -MAX_SPEED;
+					view1.move({0.f, map_y_accel});
+				}
+				else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::S))
+				{
+					if (map_y_accel < 0)
+						map_y_accel = INITIAL_SPEED;
+					map_y_accel += ACCEL_RATE;
+					if (map_y_accel > MAX_SPEED)
+						map_y_accel = MAX_SPEED;
+					view1.move({0.f, map_y_accel});
+				}
 			}
-			else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::A))
-			{
-				if (map_x_accel > 0)
-					map_x_accel = -INITIAL_SPEED;
-				map_x_accel -= ACCEL_RATE;
-				if (-map_x_accel > MAX_SPEED)
-					map_x_accel = -MAX_SPEED;
-				view1.move({map_x_accel, 0.f});
-			}
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Up) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::W))
-			{
-				if (map_y_accel > 0)
-					map_y_accel = -INITIAL_SPEED;
-				map_y_accel -= ACCEL_RATE;
-				if (-map_y_accel > MAX_SPEED)
-					map_y_accel = -MAX_SPEED;
-				view1.move({0.f, map_y_accel});
-			}
-			else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::S))
-			{
-				if (map_y_accel < 0)
-					map_y_accel = INITIAL_SPEED;
-				map_y_accel += ACCEL_RATE;
-				if (map_y_accel > MAX_SPEED)
-					map_y_accel = MAX_SPEED;
-				view1.move({0.f, map_y_accel});
-			}
-			if (mouse_position.x > 200 && rectContains(map_bounds, mouse_position)) {	
+			bool hovering_on_panel = (rectContains(left_panel_rect, mouse_position) || (rectContains(right_panel_rect, mouse_position)) || rectContains(bottom_panel_rect, mouse_position));	
+			if (!hovering_on_panel && rectContains(map_bounds, mouse_position)) {	
 				sf::Vector2f world_pos = window.mapPixelToCoords(mouse_position, view1);
 				if (world_pos.x < 0 || world_pos.x > map_width || world_pos.y < 0 || world_pos.y > map_height)
 					continue;
@@ -606,16 +656,10 @@ int main(int argc, char** argv) {
 				right_panel_on = true;
 				
 				// Because of the expensiveness of this operation, we will probably want to have a massive lookup table instead. If it just stores int and pointer maybe not that large.
-				/*bool civ_found = false;
-				for (uint16_t l = 0; l < game_world.civilizations.size() && !civ_found; l++) {
-					Civilization* this_civ = &game_world.civilizations[l];
-					for (uint32_t tile : this_civ->owned_tiles) {
-						if (tile == i) {
-							temp_build_string += "\nOwner: " + this_civ->name;
-							break;
-						}
-					}
-				}*/
+				if (game_world.tiles_look_up_table.count(i) == 1) {
+					Civilization* this_civ = game_world.tiles_look_up_table[i];
+					temp_build_string += "\nOwner: " + this_civ->name;
+				}
 				bottom_text.setString(temp_build_string);
 			} else {
 				// TODO should be pinning mechanism if a point is clicked in normal mode.
@@ -704,7 +748,24 @@ int main(int argc, char** argv) {
 			bottom_panel_buttons[i]->button_sprite->setPosition({bottom_panel_buttons[i]->left, bottom_panel_buttons[i]->top});
 			window.draw(*(bottom_panel_buttons[i]->button_sprite));
 		}
-		
+		for (std::vector<InputField*>* this_section : input_fields) {
+			for (uint8_t i = 0; i < this_section->size(); i++) {
+				InputField* this_input_field = (*this_section)[i];
+				if (this_input_field->selected)
+					this_input_field->input_field->setFillColor({180, 180, 180, 255});
+				else if (rectContains(this_input_field->input_field_rect, mouse_position))
+					this_input_field->input_field->setFillColor({120, 120, 120, 255});
+				else 
+					this_input_field->input_field->setFillColor({100, 100, 100, 255});
+				
+				this_input_field->title_text->setPosition({this_input_field->left, this_input_field->top - (5 + this_input_field->font_size * 1.25f)});
+				window.draw(*(this_input_field->title_text));
+				this_input_field->input_field->setPosition({this_input_field->left, this_input_field->top});
+				window.draw(*(this_input_field->input_field));
+				this_input_field->input_text->setPosition({this_input_field->left, this_input_field->top});
+				window.draw(*(this_input_field->input_text));
+			}
+		}	
 		window.display();
 	}
 	
