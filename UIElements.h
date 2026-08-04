@@ -92,6 +92,8 @@ struct InputField {
 
 	bool support_letters = false;
 	bool selected = false;
+	
+	uint16_t modify_position = 0;
 
 	std::string value;
 
@@ -103,7 +105,7 @@ struct InputField {
 	sf::Text* input_text;
 	sf::RectangleShape* input_field;
 	
-	InputField(sf::Font& used_font, float new_left, float new_top, float new_width, float new_height, std::string field_name, uint8_t new_font_size = 18, std::string default_value = "", bool input_support_letters = false);
+	InputField(sf::Font& used_font, float new_left, float new_top, float new_width, float new_height, std::string field_name, std::string default_value = "", uint8_t new_font_size = 18, bool input_support_letters = false);
 	
 	void setInputText(); // Sets input text to value.
 };

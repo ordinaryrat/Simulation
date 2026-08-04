@@ -47,7 +47,7 @@ SelectionPanel::SelectionPanel(float new_left, float new_top, std::string new_ti
 	panel_rect = sf::FloatRect({left, top}, {0, 0});
 }
 
-InputField::InputField(sf::Font& used_font, float new_left, float new_top, float new_width, float new_height, std::string field_name, uint8_t new_font_size, std::string default_value, bool input_support_letters) {
+InputField::InputField(sf::Font& used_font, float new_left, float new_top, float new_width, float new_height, std::string field_name, std::string default_value, uint8_t new_font_size, bool input_support_letters) {
 	left = new_left;
 	top = new_top;
 	width = new_width;
@@ -69,6 +69,8 @@ InputField::InputField(sf::Font& used_font, float new_left, float new_top, float
 	input_field->setFillColor({100, 100, 100, 255});
 
 	input_field_rect = input_field->getGlobalBounds();
+
+	modify_position = value.size();
 }
 
 void InputField::setInputText() {

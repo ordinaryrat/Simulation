@@ -14,7 +14,7 @@
 #include "Civilization.h"
 #include "Event.h"
 	
-sf::Font font("media/arial.ttf");
+sf::Font font("media/Courier.ttf");
 
 std::map<terrain, std::tuple<uint8_t, uint8_t, uint8_t>> terrain_colors = {
 	{OCEAN, std::tuple(0, 0, 255)},
@@ -219,12 +219,15 @@ std::vector<SelectionPanel*> left_selection_panels = {};
 std::vector<SelectionPanel*> bottom_selection_panels = {};
 std::vector<SelectionPanel*>* selection_panels[2] = {&left_selection_panels, &bottom_selection_panels};
 
+sf::RectangleShape modify_line({3.f, 20.f});
+
 SelectionPanel left_panel_selection(30, 30, "Map Type", {"Terrain", "Land", "Temperature", "Precipitation", "Elevation"}, font, 20, MAP_TYPE, RADIO);
 SelectionPanel civilization_selection(30, 220, "Base Layer", {"None", "Cultures", "Civilizations", "Religions", "Governments"}, font, 20, MAP_LAYER, RADIO, 2);		
 SelectionPanel modification_civ_panel(30, height - 140, "Modify Civilizations", {"Add Civilization", "Paint Borders", "Modify Civilization", "Remove Civilization"}, font, 20, MOD_CIV, RADIO);
 SelectionPanel modification_terrain_panel(30, height - 140, "Modify Terrain", {"Draw Land", "Modify Elevation", "Modify Heat", "Modify Precipitation"}, font, 20, MOD_TERRAIN, RADIO);
 
 InputField civilization_name_field(font, 300, height - 80, 100, 20, "Name");
+InputField color_input_field(font, 450, height - 80, 100, 20, "Color", "000000");
 
 std::vector<InputField*> modification_input_fields = {};
 std::vector<InputField*>* input_fields[1] = {&modification_input_fields};
@@ -402,6 +405,7 @@ int main(int argc, char** argv) {
 
 	// INPUT FIELD
 	modification_input_fields.push_back(&civilization_name_field);
+	modification_input_fields.push_back(&color_input_field);
 
 	while (window.isOpen()) {
 		sf::Vector2i mouse_position = sf::Mouse::getPosition(window);
@@ -424,18 +428,80 @@ int main(int argc, char** argv) {
 				active_window = true;
 			} 
 			if (currently_selected_input_field != NULL) { 
-				if (const auto* text_entered = event->getIf<sf::Event::TextEntered>()) {
-					currently_selected_input_field->value += text_entered->unicode;
-					currently_selected_input_field->setInputText();
-				}	
+				if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed>()) {
+					switch (key_pressed->scancode) {
+						case sf::Keyboard::Scancode::Escape:
+							currently_selected_input_field->selected = false;
+							currently_selected_input_field = NULL;
+							break;
+
+						case sf::Keyboard::Scancode::Backspace:
+							if (currently_selected_input_field->modify_position > 0) {
+								std::string val1 = "";
+								std::string val2 = "";
+								
+								std::string original_value = currently_selected_input_field->value;
+								val1 = original_value.substr(0, currently_selected_input_field->modify_position - 1);
+								val2 = original_value.substr(currently_selected_input_field->modify_position, currently_selected_input_field->value.size() - currently_selected_input_field->modify_position);
+								currently_selected_input_field->value = val1 + val2;
+								currently_selected_input_field->setInputText();
+								currently_selected_input_field->modify_position--;
+							}
+							break;
+
+						case sf::Keyboard::Scancode::Delete:
+							if (currently_selected_input_field->modify_position < currently_selected_input_field->value.size()) {
+								std::string val1 = "";
+								std::string val2 = "";
+								
+								std::string original_value = currently_selected_input_field->value;
+								val1 = original_value.substr(0, currently_selected_input_field->modify_position);
+								val2 = original_value.substr(currently_selected_input_field->modify_position + 1, currently_selected_input_field->value.size() - currently_selected_input_field->modify_position - 1);
+								currently_selected_input_field->value = val1 + val2;
+								currently_selected_input_field->setInputText();
+							}
+							break;
+					
+						case sf::Keyboard::Scancode::Left:
+							if (currently_selected_input_field->modify_position > 0)
+								currently_selected_input_field->modify_position -= 1;
+							break;
+					
+						case sf::Keyboard::Scancode::Right:
+							if (currently_selected_input_field->modify_position < currently_selected_input_field->value.size())
+								currently_selected_input_field->modify_position += 1;
+							break;
+						
+						default:
+							break;
+					}
+				}
+				if (currently_selected_input_field != NULL) { 
+					if (const auto* text_entered = event->getIf<sf::Event::TextEntered>()) {
+						if (!(text_entered->unicode == 127 || text_entered->unicode == 8)) {  
+							if (!(currently_selected_input_field->support_letters) && (text_entered->unicode < 48 || text_entered->unicode > 57))
+								continue;
+							std::string val1 = "";
+							std::string val2 = "";
+							
+							std::string original_value = currently_selected_input_field->value;
+							val1 = original_value.substr(0, currently_selected_input_field->modify_position);
+							val2 = original_value.substr(currently_selected_input_field->modify_position, currently_selected_input_field->value.size() - currently_selected_input_field->modify_position);
+							
+							std::string inputted_text = "";
+							inputted_text += text_entered->unicode;
+							currently_selected_input_field->value = val1 + inputted_text + val2;
+							currently_selected_input_field->setInputText();
+
+							currently_selected_input_field->modify_position++;
+						}
+					}
+				}
 			} else {
 				if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
 					if (keyPressed->scancode == sf::Keyboard::Scancode::Escape) {
 						right_panel_on = false;
 						current_mouse_state = REGULAR;
-						if (currently_selected_input_field != NULL)
-							currently_selected_input_field->selected = false;
-						currently_selected_input_field = NULL;
 					} else if (keyPressed->scancode == sf::Keyboard::Scancode::Space) {
 						paused = !paused;	
 						date_advance_time = 0.f;
@@ -502,6 +568,9 @@ int main(int argc, char** argv) {
 
 				civilization_name_field.top = height - 80.f;
 				civilization_name_field.input_field_rect.position.y = height - 80.f;
+			
+				color_input_field.top = height - 80.f;
+				color_input_field.input_field_rect.position.y = height - 80.f;
 			}
 			else if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && active_window)
 			{
@@ -544,6 +613,12 @@ int main(int argc, char** argv) {
 								currently_selected_input_field = this_input_field;
 								currently_selected_input_field->selected = true;
 								click_on_input_field = true;
+								
+								uint16_t mouse_x_in_field = (int)((mouse_position.x - this_input_field->left)/(0.6f * (float)currently_selected_input_field->font_size));
+								if (mouse_x_in_field <= currently_selected_input_field->value.size())
+									currently_selected_input_field->modify_position = mouse_x_in_field;
+								else 
+									currently_selected_input_field->modify_position = currently_selected_input_field->value.size();
 								break;
 							}
 						}
@@ -555,7 +630,7 @@ int main(int argc, char** argv) {
 							continue;
 						int i = ((int)world_pos.y * map_width) + (int)world_pos.x;
 						if (current_mouse_state == MAP_ADD) {	
-							std::string name = "bah";
+							std::string name = civilization_name_field.value;
 							Civilization* temp_civ = new Civilization(name, {255, 0, 0});
 							temp_civ->owned_tiles.push_back(i);
 
@@ -764,6 +839,11 @@ int main(int argc, char** argv) {
 				window.draw(*(this_input_field->input_field));
 				this_input_field->input_text->setPosition({this_input_field->left, this_input_field->top});
 				window.draw(*(this_input_field->input_text));
+				
+				if (this_input_field->selected) {
+					modify_line.setPosition({this_input_field->left + ((float)this_input_field->modify_position * 0.6f * (float)this_input_field->font_size), this_input_field->top});
+					window.draw(modify_line);
+				}
 			}
 		}	
 		window.display();

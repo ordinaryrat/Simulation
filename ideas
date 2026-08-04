@@ -26,3 +26,10 @@ Due to the sheer expensiveness of trying to calculate all adjacents, only certai
 Current setup means two civs cannot have same name? Add like (1)?
 
 Adding customization for new civs that are added. Like name, color and stuff.
+
+Make input fields have max/min values.  
+Input field values used. ✅ 
+Backspace works.
+Numerical input fields filter input to numbers only. 
+Perhaps text in an input field scrolls or is clipped which may apply to active text field. 
+Maybe have a pointer as well where input goes and arrow keys can move it.
