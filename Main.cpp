@@ -121,10 +121,12 @@ sf::Texture top_layer_texture(sf::Vector2u(map_width, map_height));
 Map game_map(map_width, map_height);
 World game_world(game_map);
 
-Civilization* new_civ = new Civilization("rat", {255, 0, 0});
-Civilization* new_civ2 = new Civilization("bat", {255, 255, 0});
+Civilization* new_civ = new Civilization(0, "rat", {255, 0, 0});
+Civilization* new_civ2 = new Civilization(1, "bat", {255, 255, 0});
 
 bool right_panel_on = false;
+bool right_panel_locked = false;
+sf::Vector2f locked_panel_position = {0.f, 0.f};
 	
 sf::Sprite base_map(base_map_texture);
 sf::Sprite top_layer_map(top_layer_texture);
@@ -196,7 +198,7 @@ void loadTopLayer(layer_type layer = CIVILIZATIONS) {
 					top_layer_pixels[(owned_tile * 4) + 0] = std::get<0>(this_civ->color);
 					top_layer_pixels[(owned_tile * 4) + 1] = std::get<1>(this_civ->color);
 					top_layer_pixels[(owned_tile * 4) + 2] = std::get<2>(this_civ->color);
-					top_layer_pixels[(owned_tile * 4) + 3] = 160;
+					top_layer_pixels[(owned_tile * 4) + 3] = 160; // CIV BORDER TRANSPARENCY
 				}
 			}
 		}
@@ -226,8 +228,9 @@ SelectionPanel civilization_selection(30, 220, "Base Layer", {"None", "Cultures"
 SelectionPanel modification_civ_panel(30, height - 140, "Modify Civilizations", {"Add Civilization", "Paint Borders", "Modify Civilization", "Remove Civilization"}, font, 20, MOD_CIV, RADIO);
 SelectionPanel modification_terrain_panel(30, height - 140, "Modify Terrain", {"Draw Land", "Modify Elevation", "Modify Heat", "Modify Precipitation"}, font, 20, MOD_TERRAIN, RADIO);
 
-InputField civilization_name_field(font, 300, height - 80, 100, 20, "Name");
-InputField color_input_field(font, 450, height - 80, 100, 20, "Color", "000000");
+InputField civilization_name_field(font, 300, height - 80, 100, 20, "Name", STRING, "name");
+InputField color_input_field(font, 450, height - 80, 100, 20, "Color", COLOR, "#000000");
+InputField select_civilization_field(font, 300, height - 80, 100, 20, "Which", INTEGER, "0"); // TODO should be a drop down bar
 
 std::vector<InputField*> modification_input_fields = {};
 std::vector<InputField*>* input_fields[1] = {&modification_input_fields};
@@ -260,11 +263,28 @@ void clickOnPanel(selection_panel_id panel_id, uint8_t option_pressed) {
 			break;
 		case (MOD_CIV):
 			current_modification_option = option_pressed;
-			current_mouse_state = MAP_ADD;
+			current_mouse_state = REGULAR;
+			switch (option_pressed) {
+				case 0:
+					// Add Civilization 
+					modification_input_fields = {};
+					modification_input_fields.push_back(&civilization_name_field);
+					modification_input_fields.push_back(&color_input_field);
+					break;
+				case 1:
+					// Paint Borders
+					modification_input_fields = {};
+					modification_input_fields.push_back(&select_civilization_field);
+					break;
+			}
+			for (InputField* this_field : modification_input_fields) {
+				this_field->top = height - 80.f;
+				this_field->input_field_rect.position.y = height - 80.f;
+			}
 			break;
 		case (MOD_TERRAIN):
 			current_modification_option = option_pressed;
-			current_mouse_state = MAP_ADD;
+			current_mouse_state = REGULAR;
 			break;
 	}
 }
@@ -286,7 +306,7 @@ void processEvents(std::vector<GameEvent> events) {
 	for (GameEvent event : events) {
 		switch (event.type) {
 			case (LAND_TAKEN): {
-				Civilization* related_civ = game_world.civ_look_up_table[event.related_civ_name];
+				Civilization* related_civ = game_world.civ_look_up_table[event.related_civ_id];
 				if (current_top_layer_view == 2) {
 					top_layer_pixels[(event.para1 * 4) + 0] = std::get<0>(related_civ->color);
 					top_layer_pixels[(event.para1 * 4) + 1] = std::get<1>(related_civ->color);
@@ -309,6 +329,8 @@ const sf::Cursor arrow_cursor = sf::Cursor::createFromSystem(sf::Cursor::Type::A
 MouseState drawn_mouse = REGULAR;
 
 int main(int argc, char** argv) {
+	game_world.next_civ_id = 2; // TODO remove when initial civs aren't created although this won't cause errors.
+	
 	std::srand(std::time({}));
 	
 	// TODO REMOVE (this can be done when loading save game)?
@@ -316,8 +338,8 @@ int main(int argc, char** argv) {
 	new_civ2->owned_tiles.push_back(50000);
 	//game_world.civilizations.push_back(new_civ);
 	//game_world.civilizations.push_back(new_civ2);
-	game_world.civ_look_up_table.insert({"rat", new_civ});
-	game_world.civ_look_up_table.insert({"bat", new_civ2});
+	game_world.civ_look_up_table.insert({0, new_civ});
+	game_world.civ_look_up_table.insert({1, new_civ2});
 	// END OF REMOVE
 
 	selected_option_circle.setFillColor({0, 0, 200});
@@ -431,6 +453,17 @@ int main(int argc, char** argv) {
 				if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed>()) {
 					switch (key_pressed->scancode) {
 						case sf::Keyboard::Scancode::Escape:
+							currently_selected_input_field->formatInput();
+							currently_selected_input_field->setInputText();
+							
+							currently_selected_input_field->selected = false;
+							currently_selected_input_field = NULL;
+							break;
+
+						case sf::Keyboard::Scancode::Enter:
+							currently_selected_input_field->formatInput();
+							currently_selected_input_field->setInputText();
+							
 							currently_selected_input_field->selected = false;
 							currently_selected_input_field = NULL;
 							break;
@@ -478,9 +511,16 @@ int main(int argc, char** argv) {
 				}
 				if (currently_selected_input_field != NULL) { 
 					if (const auto* text_entered = event->getIf<sf::Event::TextEntered>()) {
-						if (!(text_entered->unicode == 127 || text_entered->unicode == 8)) {  
-							if (!(currently_selected_input_field->support_letters) && (text_entered->unicode < 48 || text_entered->unicode > 57))
+						uint8_t actual_text_entered = text_entered->unicode;
+						if (!(actual_text_entered == 127 || actual_text_entered == 8)) {  
+							if (currently_selected_input_field->input_field_type == INTEGER && (actual_text_entered < 48 || actual_text_entered > 57))
 								continue;
+							if (currently_selected_input_field->input_field_type == COLOR && (actual_text_entered < 48 || actual_text_entered > 57)) {
+								if (actual_text_entered > 96 && actual_text_entered < 103)
+									actual_text_entered -= 32;
+								else if (!((actual_text_entered > 64 && actual_text_entered < 71) || actual_text_entered == 23))
+									continue;
+							}
 							std::string val1 = "";
 							std::string val2 = "";
 							
@@ -489,7 +529,7 @@ int main(int argc, char** argv) {
 							val2 = original_value.substr(currently_selected_input_field->modify_position, currently_selected_input_field->value.size() - currently_selected_input_field->modify_position);
 							
 							std::string inputted_text = "";
-							inputted_text += text_entered->unicode;
+							inputted_text += actual_text_entered;
 							currently_selected_input_field->value = val1 + inputted_text + val2;
 							currently_selected_input_field->setInputText();
 
@@ -501,6 +541,7 @@ int main(int argc, char** argv) {
 				if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
 					if (keyPressed->scancode == sf::Keyboard::Scancode::Escape) {
 						right_panel_on = false;
+						right_panel_locked = false;
 						current_mouse_state = REGULAR;
 					} else if (keyPressed->scancode == sf::Keyboard::Scancode::Space) {
 						paused = !paused;	
@@ -565,12 +606,11 @@ int main(int argc, char** argv) {
 					}
 				}*/
 				add_to_map_button.setPosition(width - 60.f, height - 60.f);
-
-				civilization_name_field.top = height - 80.f;
-				civilization_name_field.input_field_rect.position.y = height - 80.f;
-			
-				color_input_field.top = height - 80.f;
-				color_input_field.input_field_rect.position.y = height - 80.f;
+				
+				for (InputField* this_field : modification_input_fields) {
+					this_field->top = height - 80.f;
+					this_field->input_field_rect.position.y = height - 80.f;
+				}
 			}
 			else if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && active_window)
 			{
@@ -607,6 +647,9 @@ int main(int argc, char** argv) {
 							InputField* this_input_field = (*this_section)[i];
 							if (rectContains(this_input_field->input_field_rect, mouse_position)) {
 								if (currently_selected_input_field != NULL) {
+									currently_selected_input_field->formatInput();
+									currently_selected_input_field->setInputText();
+
 									currently_selected_input_field->selected = false;
 									currently_selected_input_field = NULL;
 								}									
@@ -630,20 +673,50 @@ int main(int argc, char** argv) {
 							continue;
 						int i = ((int)world_pos.y * map_width) + (int)world_pos.x;
 						if (current_mouse_state == MAP_ADD) {	
-							std::string name = civilization_name_field.value;
-							Civilization* temp_civ = new Civilization(name, {255, 0, 0});
-							temp_civ->owned_tiles.push_back(i);
+							switch (current_modification_option) {
+								case 0: {
+									// Add Civilization
+									std::string name = civilization_name_field.value;
+									std::tuple<uint8_t, uint8_t, uint8_t> hex_color_value = *(color_input_field.getColorValue());
+									
+									int civ_id = game_world.next_civ_id;
+									Civilization* temp_civ = new Civilization(civ_id, name, hex_color_value);
+									temp_civ->owned_tiles.push_back(i);
 
-							game_world.civilizations.push_back(temp_civ);
-							game_world.civ_look_up_table.insert({name, temp_civ});	
-							
-							processEvents({GameEvent(LAND_TAKEN, i, name)});
-							current_mouse_state = REGULAR;
+									game_world.civilizations.push_back(temp_civ);
+									game_world.civ_look_up_table.insert({civ_id, temp_civ});	
+									
+									processEvents({GameEvent(LAND_TAKEN, i, civ_id)});
+									current_mouse_state = REGULAR;
+									game_world.next_civ_id++;
+									break;
+								}
+								case 1: {
+									// Paint Borders
+									std::vector<GameEvent> return_events = {};	
+									
+									Civilization* this_civ = game_world.civ_look_up_table[select_civilization_field.getNumber()]; // Should get value from number.
+									if (this_civ == NULL) {
+										current_mouse_state = REGULAR;
+										break;
+									}
+									
+									processEvents({GameEvent(LAND_TAKEN, i, this_civ->id)});
+									this_civ->owned_tiles.push_back(i);
+									break;
+								}
+							}
+						} else {
+							right_panel_locked = !right_panel_locked;
+							locked_panel_position = world_pos; 
 						}
 					}
 				}
 				if (!click_on_input_field) {
 					if (currently_selected_input_field != NULL) {
+						currently_selected_input_field->formatInput();
+						currently_selected_input_field->setInputText();
+						
 						currently_selected_input_field->selected = false;
 						currently_selected_input_field = NULL;
 					}									
@@ -723,9 +796,14 @@ int main(int argc, char** argv) {
 			}
 			bool hovering_on_panel = (rectContains(left_panel_rect, mouse_position) || (rectContains(right_panel_rect, mouse_position)) || rectContains(bottom_panel_rect, mouse_position));	
 			if (!hovering_on_panel && rectContains(map_bounds, mouse_position)) {	
-				sf::Vector2f world_pos = window.mapPixelToCoords(mouse_position, view1);
-				if (world_pos.x < 0 || world_pos.x > map_width || world_pos.y < 0 || world_pos.y > map_height)
-					continue;
+				sf::Vector2f world_pos = {0, 0};
+				if (right_panel_locked) {
+					world_pos = locked_panel_position; // perhaps if what is being hovered is something else that will need to be a variable as well?
+				} else {
+					world_pos = window.mapPixelToCoords(mouse_position, view1);
+					if (world_pos.x < 0 || world_pos.x > map_width || world_pos.y < 0 || world_pos.y > map_height)
+						continue;
+				}
 				int i = ((int)world_pos.y * map_width) + (int)world_pos.x;
 				std::string temp_build_string = "(" + std::to_string((int)world_pos.x) + ", " + std::to_string((int)world_pos.y) + ")" + "\nTerrain: " + terrain_names[game_map.terrain_map[i]];
 				right_panel_on = true;
@@ -753,7 +831,7 @@ int main(int argc, char** argv) {
 		window.draw(month_date_text);
 		window.draw(time_speed_text);
 		
-		if (right_panel_on) {
+		if (right_panel_on || right_panel_locked) {
 			window.draw(right_panel);
 			window.draw(bottom_text);
 		}

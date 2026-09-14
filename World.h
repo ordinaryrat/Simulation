@@ -9,7 +9,8 @@
 struct World {
 	Map* game_map;
 	std::vector<Civilization*> civilizations;
-	
+	int next_civ_id = 0; // If we want to store info on past civs we need to do this.
+
 	int date[3] = {0, 0, 0};
 	
 	World(Map& input_game_map) {
@@ -18,7 +19,7 @@ struct World {
 
 	std::vector<GameEvent> incrementDate(); 
 	
-	std::map<std::string, Civilization*> civ_look_up_table = {};
+	std::map<int, Civilization*> civ_look_up_table = {};
 
 	std::map<uint32_t, Civilization*> tiles_look_up_table = {};
 };

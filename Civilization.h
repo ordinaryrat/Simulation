@@ -11,11 +11,14 @@ struct NameGenerator {
 };
 
 struct Civilization {
+	int id;
+
 	std::string name;
 	std::vector<uint32_t> owned_tiles;
 	std::tuple<uint8_t, uint8_t, uint8_t> color;
 
-	Civilization(std::string input_name, std::tuple<uint8_t, uint8_t, uint8_t> input_color) {
+	Civilization(int civ_id, std::string input_name, std::tuple<uint8_t, uint8_t, uint8_t> input_color) {
+		id = civ_id;
 		name = input_name;
 		color = input_color;
 	}

@@ -22,6 +22,12 @@ enum selection_panel_id {
 	MOD_TERRAIN,
 };
 
+enum InputFieldType {
+	STRING,
+	INTEGER,
+	COLOR	
+};
+
 struct Button {
 	sf::Sprite* button_sprite;
 	sf::FloatRect* button_collision_box;
@@ -90,7 +96,7 @@ struct InputField {
 	sf::Font* font;
 	uint8_t font_size;
 
-	bool support_letters = false;
+	InputFieldType input_field_type;
 	bool selected = false;
 	
 	uint16_t modify_position = 0;
@@ -105,9 +111,12 @@ struct InputField {
 	sf::Text* input_text;
 	sf::RectangleShape* input_field;
 	
-	InputField(sf::Font& used_font, float new_left, float new_top, float new_width, float new_height, std::string field_name, std::string default_value = "", uint8_t new_font_size = 18, bool input_support_letters = false);
+	InputField(sf::Font& used_font, float new_left, float new_top, float new_width, float new_height, std::string field_name, InputFieldType input_field_type, std::string default_value = "", uint8_t new_font_size = 18);
 	
 	void setInputText(); // Sets input text to value.
+	std::tuple<uint8_t, uint8_t, uint8_t>* getColorValue(); // Gets current color value and returns.
+	void formatInput(); // Checks if user input is valid and then can modify.
+	uint32_t getNumber();
 };
 
 #endif
