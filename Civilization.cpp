@@ -5,6 +5,18 @@
 #include "Event.h"
 #include <vector>
 
+Civilization::Civilization(int civ_id, std::string input_name, std::tuple<uint8_t, uint8_t, uint8_t> input_color, Character* leader) {
+	// I don't think these parameters should be permanent.
+	id = civ_id;
+	name = input_name;
+	color = input_color;
+	
+	// Assuming randomly generating government.
+	government = new Government(leader);
+	characters.push_back(leader);
+}
+
+
 std::vector<uint32_t> getAdjacentTiles(uint32_t tile, Map* game_map, bool water_invalid = true) {
 	std::vector<uint32_t> output_list = {};
 

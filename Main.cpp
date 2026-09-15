@@ -121,9 +121,6 @@ sf::Texture top_layer_texture(sf::Vector2u(map_width, map_height));
 Map game_map(map_width, map_height);
 World game_world(game_map);
 
-Civilization* new_civ = new Civilization(0, "rat", {255, 0, 0});
-Civilization* new_civ2 = new Civilization(1, "bat", {255, 255, 0});
-
 bool right_panel_on = false;
 bool right_panel_locked = false;
 sf::Vector2f locked_panel_position = {0.f, 0.f};
@@ -314,7 +311,7 @@ void processEvents(std::vector<GameEvent> events) {
 					top_layer_pixels[(event.para1 * 4) + 3] = 160;
 					update_top_layer_texture = true;
 				}
-				game_world.tiles_look_up_table.insert({event.para1, related_civ});
+				game_world.tiles_look_up_table.insert_or_assign(event.para1, related_civ);
 			}
 		}
 	}
@@ -329,18 +326,9 @@ const sf::Cursor arrow_cursor = sf::Cursor::createFromSystem(sf::Cursor::Type::A
 MouseState drawn_mouse = REGULAR;
 
 int main(int argc, char** argv) {
-	game_world.next_civ_id = 2; // TODO remove when initial civs aren't created although this won't cause errors.
+	game_world.next_civ_id = 0;
 	
 	std::srand(std::time({}));
-	
-	// TODO REMOVE (this can be done when loading save game)?
-	new_civ->owned_tiles.push_back(10000);
-	new_civ2->owned_tiles.push_back(50000);
-	//game_world.civilizations.push_back(new_civ);
-	//game_world.civilizations.push_back(new_civ2);
-	game_world.civ_look_up_table.insert({0, new_civ});
-	game_world.civ_look_up_table.insert({1, new_civ2});
-	// END OF REMOVE
 
 	selected_option_circle.setFillColor({0, 0, 200});
 	unselected_option_circle.setFillColor({100, 100, 100});
@@ -676,11 +664,14 @@ int main(int argc, char** argv) {
 							switch (current_modification_option) {
 								case 0: {
 									// Add Civilization
+									Culture* culture = new Culture("l");
+									Character* leader = new Character(i, game_world.date, culture);
+
 									std::string name = civilization_name_field.value;
 									std::tuple<uint8_t, uint8_t, uint8_t> hex_color_value = *(color_input_field.getColorValue());
 									
 									int civ_id = game_world.next_civ_id;
-									Civilization* temp_civ = new Civilization(civ_id, name, hex_color_value);
+									Civilization* temp_civ = new Civilization(civ_id, name, hex_color_value, leader);
 									temp_civ->owned_tiles.push_back(i);
 
 									game_world.civilizations.push_back(temp_civ);
@@ -689,25 +680,31 @@ int main(int argc, char** argv) {
 									processEvents({GameEvent(LAND_TAKEN, i, civ_id)});
 									current_mouse_state = REGULAR;
 									game_world.next_civ_id++;
+									
+									right_panel_locked = false;
 									break;
 								}
 								case 1: {
 									// Paint Borders
 									std::vector<GameEvent> return_events = {};	
-									
 									Civilization* this_civ = game_world.civ_look_up_table[select_civilization_field.getNumber()]; // Should get value from number.
 									if (this_civ == NULL) {
 										current_mouse_state = REGULAR;
 										break;
 									}
-									
-									processEvents({GameEvent(LAND_TAKEN, i, this_civ->id)});
-									this_civ->owned_tiles.push_back(i);
+									if (game_world.tiles_look_up_table[i] != this_civ) {
+										processEvents({GameEvent(LAND_TAKEN, i, this_civ->id)});
+										this_civ->owned_tiles.push_back(i);
+									}
+									right_panel_locked = false;
 									break;
 								}
+								default:
+									current_mouse_state = REGULAR;
+									break;
 							}
 						} else {
-							right_panel_locked = !right_panel_locked;
+							right_panel_locked = true;
 							locked_panel_position = world_pos; 
 						}
 					}
@@ -730,7 +727,7 @@ int main(int argc, char** argv) {
 				switch (mouseWheelScrolled->wheel)
 				{
 					case sf::Mouse::Wheel::Vertical:
-						if (view_zoom_accel > 0 && mouseWheelScrolled->delta == 1 || view_zoom_accel < 0 && mouseWheelScrolled->delta == -1)
+						if ((view_zoom_accel > 0 && mouseWheelScrolled->delta == 1) || (view_zoom_accel < 0 && mouseWheelScrolled->delta == -1))
 							view_zoom_accel = 0;
 						view_zoom_accel += mouseWheelScrolled->delta/-100;
 						view1.zoom(1 + view_zoom_accel);
@@ -812,6 +809,9 @@ int main(int argc, char** argv) {
 				if (game_world.tiles_look_up_table.count(i) == 1) {
 					Civilization* this_civ = game_world.tiles_look_up_table[i];
 					temp_build_string += "\nOwner: " + this_civ->name;
+					if (this_civ->government->leader != NULL) {
+						temp_build_string += "\nLeader: " + this_civ->government->leader->name + "\nAge: " + std::to_string(this_civ->government->leader->age);
+					}
 				}
 				bottom_text.setString(temp_build_string);
 			} else {
