@@ -391,7 +391,7 @@ int main(int argc, char** argv) {
 	
 	year_date_text.setPosition({width/2.f - 140.f, 10.f});
 	month_date_text.setPosition({width/2.f - 70.f, 10.f});
-	time_speed_text.setPosition({width/2.f + 10.f, 10.f});
+	time_speed_text.setPosition({width/2.f + 95.f, 10.f});
 
 	// Will need to be more flexible in the future. 
 	left_selection_panels.push_back(&left_panel_selection);
@@ -578,8 +578,8 @@ int main(int argc, char** argv) {
 				date_panel.setPosition({width/2.f - 150.f, 0.f});
 				
 				year_date_text.setPosition({width/2.f - 140.f, 10.f});
-				month_date_text.setPosition({width/2.f - 70.f, 10.f});
-				time_speed_text.setPosition({width/2.f + 10.f, 10.f});
+				month_date_text.setPosition({width/2.f - 60.f, 10.f});
+				time_speed_text.setPosition({width/2.f + 80.f, 10.f});
 
 				modification_civ_panel.top = height - 140.f;
 				modification_terrain_panel.top = height - 140.f;
@@ -744,9 +744,24 @@ int main(int argc, char** argv) {
 			processEvents(game_world.incrementDate());
 			date_advance_time = 0.f;
 		}
+		
+		std::string date_suffix = "th";
+		switch (game_world.date[2]) {
+			case 1:
+				date_suffix = "st";
+				break;
+			case 2:
+				date_suffix = "nd";
+				break;
+			case 3:
+				date_suffix = "rd";
+				break;
+			default:
+				break;
+		}
 
 		year_date_text.setString("Year " + std::to_string(game_world.date[0]));	
-		month_date_text.setString(months[game_world.date[1]]);	
+		month_date_text.setString(months[game_world.date[1]] + ", " + std::to_string(game_world.date[2]) + date_suffix);
 		if (paused)
 			time_speed_text.setString("Paused");	
 		else

@@ -19,9 +19,12 @@ struct Civilization {
 	Civilization(int civ_id, std::string input_name, std::tuple<uint8_t, uint8_t, uint8_t> input_color, Character* leader);
 
 	std::vector<GameEvent> addAdjTiles(Map* game_map, uint16_t seed_effect);
-	
+		
 	Government* government;
 	std::vector<Character*> characters;
+
+	int total_gold = 0;
+	uint32_t total_population = 0;
 };
 
 #endif

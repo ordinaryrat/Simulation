@@ -1,6 +1,8 @@
 #ifndef GAMEEVENT_H
 #define GAMEEVENT_H
 
+// Game Events are sent over and signify visual changes. These can also be used to notify player of stuff.
+
 enum event_type {
 	LAND_TAKEN,
 };
