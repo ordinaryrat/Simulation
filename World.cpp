@@ -80,6 +80,9 @@ std::vector<GameEvent*> World::processCharacter(Civilization* this_civ, Characte
 
 					return_events.push_back(new GameEvent(LAND_TAKEN, decision->related_tile, this_civ->id));
 					return_events.push_back(new GameEvent(LAND_BECOME_TRIBAL, former_tile, this_civ->id));
+					
+					this_char->location = decision->related_tile;
+
 					break;
 				}
 			}

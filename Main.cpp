@@ -100,7 +100,8 @@ float INITIAL_SPEED = 5;
 float ACCEL_RATE = 1;
 float MAX_SPEED = 10;
 
-sf::Texture character_map_image_texture("media/Character.png");
+sf::Image character_map_image("media/Character.png");
+sf::Texture character_map_image_texture(character_map_image);
 sf::Sprite character_sprite(character_map_image_texture);
 
 sf::Texture add_to_map_texture("media/AddToMapButton.png");
@@ -355,6 +356,9 @@ void processEvents(std::vector<GameEvent*> events) {
 	}
 }
 
+std::vector<sf::FloatRect> character_rects;
+std::vector<Character*> displayed_characters;
+
 const sf::Cursor crosshair_cursor = sf::Cursor::createFromSystem(sf::Cursor::Type::Cross).value();
 const sf::Cursor arrow_cursor = sf::Cursor::createFromSystem(sf::Cursor::Type::Arrow).value();
 MouseState drawn_mouse = REGULAR;
@@ -386,6 +390,7 @@ int main(int argc, char** argv) {
 	sf::FloatRect map_bounds = base_map.getGlobalBounds();
 
 	float view_zoom_accel = 0.f;
+	float net_zoom = 100.f;
 	float map_x_accel = 0.f;
 	float map_y_accel = 0.f;
 	view1.zoom(1.f);
@@ -451,6 +456,10 @@ int main(int argc, char** argv) {
 	modification_input_fields.push_back(&civilization_name_field);
 	modification_input_fields.push_back(&color_input_field);
 
+	// characters
+	character_rects = {};
+	displayed_characters = {};
+	
 	while (window.isOpen()) {
 		sf::Vector2i mouse_position = sf::Mouse::getPosition(window);
        	
@@ -737,8 +746,12 @@ int main(int argc, char** argv) {
 									break;
 							}
 						} else {
-							right_panel_locked = true;
-							locked_panel_position = world_pos; 
+							if (locked_panel_position == world_pos) {
+								// Open interface for this pixel?
+							} else {
+								right_panel_locked = true;
+								locked_panel_position = world_pos; 
+							}
 						}
 					}
 				}
@@ -764,6 +777,7 @@ int main(int argc, char** argv) {
 							view_zoom_accel = 0;
 						view_zoom_accel += mouseWheelScrolled->delta/-100;
 						view1.zoom(1 + view_zoom_accel);
+						net_zoom *= (1 + view_zoom_accel);
 						break;
 					case sf::Mouse::Wheel::Horizontal:
 						break;
@@ -810,7 +824,7 @@ int main(int argc, char** argv) {
 					map_x_accel += ACCEL_RATE;
 					if (map_x_accel > MAX_SPEED)
 						map_x_accel = MAX_SPEED;
-					view1.move({map_x_accel, 0.f});
+					view1.move({map_x_accel * (net_zoom/40.f), 0.f});
 				}
 				else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::A))
 				{
@@ -819,7 +833,7 @@ int main(int argc, char** argv) {
 					map_x_accel -= ACCEL_RATE;
 					if (-map_x_accel > MAX_SPEED)
 						map_x_accel = -MAX_SPEED;
-					view1.move({map_x_accel, 0.f});
+					view1.move({map_x_accel * (net_zoom/40.f), 0.f});
 				}
 				if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Up) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::W))
 				{
@@ -828,7 +842,7 @@ int main(int argc, char** argv) {
 					map_y_accel -= ACCEL_RATE;
 					if (-map_y_accel > MAX_SPEED)
 						map_y_accel = -MAX_SPEED;
-					view1.move({0.f, map_y_accel});
+					view1.move({0.f, map_y_accel * (net_zoom/40.f)});
 				}
 				else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::S))
 				{
@@ -837,35 +851,56 @@ int main(int argc, char** argv) {
 					map_y_accel += ACCEL_RATE;
 					if (map_y_accel > MAX_SPEED)
 						map_y_accel = MAX_SPEED;
-					view1.move({0.f, map_y_accel});
+					view1.move({0.f, map_y_accel * (net_zoom/40.f)});
 				}
 			}
 			bool hovering_on_panel = (rectContains(left_panel_rect, mouse_position) || (rectContains(right_panel_rect, mouse_position)) || rectContains(bottom_panel_rect, mouse_position));	
 			if (!hovering_on_panel && rectContains(map_bounds, mouse_position)) {	
-				sf::Vector2f world_pos = {0, 0};
-				if (right_panel_locked) {
-					world_pos = locked_panel_position; // perhaps if what is being hovered is something else that will need to be a variable as well?
-				} else {
-					world_pos = window.mapPixelToCoords(mouse_position, view1);
-					if (world_pos.x < 0 || world_pos.x > map_width || world_pos.y < 0 || world_pos.y > map_height)
-						continue;
-				}
-				int i = ((int)world_pos.y * map_width) + (int)world_pos.x;
-				std::string temp_build_string = "(" + std::to_string((int)world_pos.x) + ", " + std::to_string((int)world_pos.y) + ")" + "\nTerrain: " + terrain_names[game_map.terrain_map[i]];
-				right_panel_on = true;
 				
-				if (game_world.tiles_look_up_table.count(i) == 1) {
-					Civilization* this_civ = game_world.tiles_look_up_table[i];
-					temp_build_string += "\nOwner: " + this_civ->name;
-					if (this_civ->government->leader != NULL) {
-						temp_build_string += "\nLeader: " + this_civ->government->leader->name + "\nAge: " + std::to_string(this_civ->government->leader->age);
+				// Checking for character collision with mouse.
+				bool touching_character = false;
+				for (uint16_t i = 0; i < character_rects.size(); i++) {
+					if (rectContains(character_rects[i], mouse_position, 0)) { // Needs 0 padding.
+						uint16_t x_on_rect = mouse_position.x - character_rects[i].position.x;
+						uint16_t y_on_rect = mouse_position.y - character_rects[i].position.y;
+						sf::Color color_here = character_map_image.getPixel({x_on_rect, y_on_rect});
+						if (color_here.a > 0) {
+							touching_character = true;
+							std::string temp_build_string = displayed_characters[i]->name;
+							right_panel_on = true;
+							
+							bottom_text.setString(temp_build_string);
+							
+							break;
+						}
 					}
 				}
-				if (game_world.tribal_land_look_up_table.count(i) == 1) {
-					Civilization* this_civ = game_world.tribal_land_look_up_table[i];
-					temp_build_string += "\nTribal Land of: " + this_civ->name;
+				if (!touching_character) {
+					sf::Vector2f world_pos = {0, 0};
+					if (right_panel_locked) {
+						world_pos = locked_panel_position; // perhaps if what is being hovered is something else that will need to be a variable as well?
+					} else {
+						world_pos = window.mapPixelToCoords(mouse_position, view1);
+						if (world_pos.x < 0 || world_pos.x > map_width || world_pos.y < 0 || world_pos.y > map_height)
+							continue;
+					}
+					int i = ((int)world_pos.y * map_width) + (int)world_pos.x;
+					std::string temp_build_string = "(" + std::to_string((int)world_pos.x) + ", " + std::to_string((int)world_pos.y) + ")" + "\nTerrain: " + terrain_names[game_map.terrain_map[i]];
+					right_panel_on = true;
+					
+					if (game_world.tiles_look_up_table.count(i) == 1) {
+						Civilization* this_civ = game_world.tiles_look_up_table[i];
+						temp_build_string += "\nOwner: " + this_civ->name;
+						if (this_civ->government->leader != NULL) {
+							temp_build_string += "\nLeader: " + this_civ->government->leader->name + "\nAge: " + std::to_string(this_civ->government->leader->age);
+						}
+					}
+					if (game_world.tribal_land_look_up_table.count(i) == 1) {
+						Civilization* this_civ = game_world.tribal_land_look_up_table[i];
+						temp_build_string += "\nTribal Land of: " + this_civ->name;
+					}
+					bottom_text.setString(temp_build_string);
 				}
-				bottom_text.setString(temp_build_string);
 			} else {
 				// TODO should be pinning mechanism if a point is clicked in normal mode.
 				right_panel_on = false;
@@ -876,13 +911,23 @@ int main(int argc, char** argv) {
 		window.draw(top_layer_map);
 		
 		window.setView(ui_view);
+		
+		character_rects = {};
+		displayed_characters = {};
+		
 		for (Civilization* this_civ : game_world.civilizations) {
+			// Character display should be able to be disabled.
+			// Also some characters shouldn't be displayed at some zoom levels.
 			for (Character* this_char : this_civ->characters) {
-				float this_x = (float)(this_char->location % game_world.game_map->width);
-				float this_y = (float)game_world.fastFloor(this_char->location / game_world.game_map->width);
+				float this_x = (float)(this_char->location % game_world.game_map->width) + 0.5f;
+				float this_y = (float)game_world.fastFloor(this_char->location / game_world.game_map->width) + 0.5f;
 				sf::Vector2i character_pos = window.mapCoordsToPixel({this_x, this_y}, view1);
-				character_sprite.setPosition({(float)character_pos.x, (float)character_pos.y});	
+				character_sprite.setColor({std::get<0>(this_civ->color), std::get<1>(this_civ->color), std::get<2>(this_civ->color), 255});
+				character_sprite.setPosition({(float)character_pos.x - 15.f, (float)character_pos.y - 15.f});	
 				window.draw(character_sprite);
+				character_rects.push_back(character_sprite.getGlobalBounds());
+				
+				displayed_characters.push_back(this_char);
 			}
 		}	
 
