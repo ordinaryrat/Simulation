@@ -100,8 +100,8 @@ float INITIAL_SPEED = 5;
 float ACCEL_RATE = 1;
 float MAX_SPEED = 10;
 
-sf::Texture button_hovered_overlay_texture("media/ButtonOverlay.png");
-sf::Sprite button_hovered_overlay(button_hovered_overlay_texture);
+sf::Texture character_map_image_texture("media/Character.png");
+sf::Sprite character_sprite(character_map_image_texture);
 
 sf::Texture add_to_map_texture("media/AddToMapButton.png");
 
@@ -331,8 +331,22 @@ void processEvents(std::vector<GameEvent*> events) {
 				game_world.tiles_look_up_table.erase(game_world.tiles_look_up_table.find(event.para1));
 				break;
 			}
+			case (LAND_BECOME_TRIBAL): {
+				Civilization* related_civ = game_world.civ_look_up_table[event.related_civ_id];
+				if (current_top_layer_view == 2) {
+					top_layer_pixels[(event.para1 * 4) + 0] = std::get<0>(related_civ->color);
+					top_layer_pixels[(event.para1 * 4) + 1] = std::get<1>(related_civ->color);
+					top_layer_pixels[(event.para1 * 4) + 2] = std::get<2>(related_civ->color);
+					top_layer_pixels[(event.para1 * 4) + 3] = 80;
+					update_top_layer_texture = true;
+				}
+				game_world.tiles_look_up_table.erase(game_world.tiles_look_up_table.find(event.para1));
+				game_world.tribal_land_look_up_table.insert_or_assign(event.para1, related_civ);
+				// TODO may be important to keep track of tribal land in future.
+				//game_world.tiles_look_up_table.insert_or_assign(event.para1, related_civ);
+				break;
+			}
 		}
-		std::cout << "freeing :" << event_p << std::endl;
 		free(event_p);
 	}
 	if (update_top_layer_texture) {
@@ -378,7 +392,7 @@ int main(int argc, char** argv) {
 	
 	// REMOVE AT SOME POINT
    	sf::Text bottom_text(font, "", 18);
-	bottom_text.setPosition({width - 140.f, 50.f});
+	bottom_text.setPosition({width - 170.f, 20.f});
 	
 	// INITIALIZING PANELS
 	sf::RectangleShape bottom_panel({(float) width, 150.f}); 
@@ -593,7 +607,7 @@ int main(int argc, char** argv) {
 				right_panel_rect.size = {200.f, height - 200.f};
 				right_panel_rect.position = {(float) width - 200.f, 0.f};
 
-				bottom_text.setPosition({width - 140.f, 50.f});
+				bottom_text.setPosition({width - 170.f, 20.f});
 				
 				date_panel.setPosition({width/2.f - 150.f, 0.f});
 				
@@ -692,8 +706,6 @@ int main(int argc, char** argv) {
 									
 									int civ_id = game_world.next_civ_id;
 									Civilization* temp_civ = new Civilization(civ_id, name, hex_color_value, leader, i, game_world.game_map);
-									
-									temp_civ->owned_tiles.push_back(i);
 
 									game_world.civilizations.push_back(temp_civ);
 									game_world.civ_look_up_table.insert({civ_id, temp_civ});	
@@ -842,13 +854,16 @@ int main(int argc, char** argv) {
 				std::string temp_build_string = "(" + std::to_string((int)world_pos.x) + ", " + std::to_string((int)world_pos.y) + ")" + "\nTerrain: " + terrain_names[game_map.terrain_map[i]];
 				right_panel_on = true;
 				
-				// Because of the expensiveness of this operation, we will probably want to have a massive lookup table instead. If it just stores int and pointer maybe not that large.
 				if (game_world.tiles_look_up_table.count(i) == 1) {
 					Civilization* this_civ = game_world.tiles_look_up_table[i];
 					temp_build_string += "\nOwner: " + this_civ->name;
 					if (this_civ->government->leader != NULL) {
 						temp_build_string += "\nLeader: " + this_civ->government->leader->name + "\nAge: " + std::to_string(this_civ->government->leader->age);
 					}
+				}
+				if (game_world.tribal_land_look_up_table.count(i) == 1) {
+					Civilization* this_civ = game_world.tribal_land_look_up_table[i];
+					temp_build_string += "\nTribal Land of: " + this_civ->name;
 				}
 				bottom_text.setString(temp_build_string);
 			} else {
@@ -859,8 +874,18 @@ int main(int argc, char** argv) {
 		window.setView(view1);
 		window.draw(base_map);
 		window.draw(top_layer_map);
-
+		
 		window.setView(ui_view);
+		for (Civilization* this_civ : game_world.civilizations) {
+			for (Character* this_char : this_civ->characters) {
+				float this_x = (float)(this_char->location % game_world.game_map->width);
+				float this_y = (float)game_world.fastFloor(this_char->location / game_world.game_map->width);
+				sf::Vector2i character_pos = window.mapCoordsToPixel({this_x, this_y}, view1);
+				character_sprite.setPosition({(float)character_pos.x, (float)character_pos.y});	
+				window.draw(character_sprite);
+			}
+		}	
+
 		window.draw(left_panel);
 		window.draw(date_panel);
 		

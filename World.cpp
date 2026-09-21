@@ -20,6 +20,7 @@ std::vector<GameEvent*> World::processCivilization(Civilization* this_civ) {
 		game_map->devastation_map[this_tile] += this_civ->tile_info[this_tile]->population * 0.0001f;
 		
 		float food_remaining = 10000 * (game_map->fertility_map[this_tile] - game_map->devastation_map[this_tile]) - this_civ->tile_info[this_tile]->population;
+		std::cout << "--- NEW DAY ---" << std::endl;
 		std::cout << food_remaining << " food left" << std::endl;
 		if (food_remaining < 0) {
 			if (food_remaining * -1.f > this_civ->tile_info[this_tile]->population) {
@@ -78,7 +79,7 @@ std::vector<GameEvent*> World::processCharacter(Civilization* this_civ, Characte
 					this_civ->government->capital = decision->related_tile;
 
 					return_events.push_back(new GameEvent(LAND_TAKEN, decision->related_tile, this_civ->id));
-					return_events.push_back(new GameEvent(LAND_LOST, former_tile, this_civ->id));
+					return_events.push_back(new GameEvent(LAND_BECOME_TRIBAL, former_tile, this_civ->id));
 					break;
 				}
 			}
@@ -168,4 +169,11 @@ std::vector<GameEvent*> World::incrementDate() {
 	}
 
 	return return_events;
+}
+
+int World::fastFloor(float x) {
+	if (x > 0)
+		return (int)x;
+	else
+		return (int)x - 1;
 }

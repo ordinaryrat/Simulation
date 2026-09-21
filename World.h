@@ -22,10 +22,12 @@ struct World {
 	
 	std::vector<GameEvent*> processCivilization(Civilization* this_civ); 
 	std::vector<GameEvent*> processCharacter(Civilization* this_civ, Character* this_char); 
-	
+	int fastFloor(float x);
+
 	std::map<int, Civilization*> civ_look_up_table = {};
 
 	std::map<uint32_t, Civilization*> tiles_look_up_table = {};
+	std::map<uint32_t, Civilization*> tribal_land_look_up_table = {};
 	
 	uint8_t lengths_of_months[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 };

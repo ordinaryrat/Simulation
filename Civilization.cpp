@@ -11,10 +11,12 @@ Civilization::Civilization(int civ_id, std::string input_name, std::tuple<uint8_
 	name = input_name;
 	color = input_color;
 	
-	// Assuming randomly generating government.
+	// Assuming randomly generating government and it is a MIGRATORY tribe.
 	government = new Government(leader, MIGRATORY, capital);
 	characters.push_back(leader);
 	tile_info.insert({capital, new Tile(100)});
+	owned_tiles.push_back(capital);
+	tribal_land.push_back(capital);
 }
 
 std::vector<GameEvent> Civilization::addAdjTiles(Map* game_map, uint16_t seed_effect) {

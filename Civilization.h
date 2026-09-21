@@ -23,6 +23,7 @@ struct Civilization {
 
 	std::string name;
 	std::vector<uint32_t> owned_tiles;
+	std::vector<uint32_t> tribal_land;
 
 	std::map<uint32_t, Tile*> tile_info;
 
