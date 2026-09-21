@@ -1,5 +1,14 @@
 #include "Map.h"
 #include "Simplex.h"
+#include <vector>
+
+float Map::fastAbs(float input) {
+	if (input > 0.f) {
+		return input;
+	} else {
+		return input * -1.f;
+	}
+}
 
 Map::Map(uint16_t input_width, uint16_t input_height, float land_factor, float max_temp, float min_temp) {
 	width = input_width;
@@ -8,7 +17,9 @@ Map::Map(uint16_t input_width, uint16_t input_height, float land_factor, float m
 	land_map = new bool[input_width * input_height];
 	terrain_map = new terrain[input_width * input_height];
 	temperature_map = new float[input_width * input_height];
-	
+	fertility_map = new float[input_width * input_height];
+	devastation_map = (float*)calloc(input_width * input_height, sizeof(float));
+
 	Simplex temp_elevation_map(input_width, input_height, 0.005, 1);
 	Simplex factor_temperature_map(input_width, input_height, 0.02, 2);
 	Simplex factor_precipitation_map(input_width, input_height, 0.01, 3);
@@ -32,6 +43,17 @@ Map::Map(uint16_t input_width, uint16_t input_height, float land_factor, float m
 
 			precipitation_map = factor_precipitation_map.grid;
 			elevation_map = temp_elevation_map.grid;
+			
+			if (!land_map[i]) {
+				fertility_map[i] = 0;
+			} else {
+				float c1 = (fastAbs(0.8f - precipitation_map[i])/0.8f) * (fastAbs(0.8f - precipitation_map[i])/0.8f);
+				float c2 = fastAbs(26.f - temperature_map[i])/26.f;
+				fertility_map[i] = 1.f - (c1+c2);
+				if (fertility_map[i] < 0) {
+					fertility_map[i] = 0;
+				}
+			}
 			
 			if (elevation_map[i] < (1 - land_factor) && temperature_map[i] < 0) {
 				terrain_map[i] = ICE;
@@ -87,3 +109,18 @@ Map::Map(uint16_t input_width, uint16_t input_height, float land_factor, float m
 		}
 	}
 }
+
+std::vector<uint32_t> Map::getAdjacentTiles(uint32_t tile, bool water_invalid) {
+	std::vector<uint32_t> output_list = {};
+	
+	if (tile % width > 0)
+		output_list.push_back(tile - 1);
+	if (tile % width < width - 1)
+		output_list.push_back(tile + 1);
+	if (tile / width >= 1)
+		output_list.push_back(tile - width);
+	if (tile / width <= height - 1)
+		output_list.push_back(tile + width);
+	return output_list;
+}
+

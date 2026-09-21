@@ -5,6 +5,7 @@
 
 enum event_type {
 	LAND_TAKEN,
+	LAND_LOST,
 };
 
 struct GameEvent {

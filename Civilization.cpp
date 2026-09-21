@@ -5,33 +5,16 @@
 #include "Event.h"
 #include <vector>
 
-Civilization::Civilization(int civ_id, std::string input_name, std::tuple<uint8_t, uint8_t, uint8_t> input_color, Character* leader) {
+Civilization::Civilization(int civ_id, std::string input_name, std::tuple<uint8_t, uint8_t, uint8_t> input_color, Character* leader, uint32_t capital, Map* game_map) {
 	// I don't think these parameters should be permanent.
 	id = civ_id;
 	name = input_name;
 	color = input_color;
 	
 	// Assuming randomly generating government.
-	government = new Government(leader);
+	government = new Government(leader, MIGRATORY, capital);
 	characters.push_back(leader);
-}
-
-
-std::vector<uint32_t> getAdjacentTiles(uint32_t tile, Map* game_map, bool water_invalid = true) {
-	std::vector<uint32_t> output_list = {};
-
-	uint16_t width = game_map->width;
-	uint16_t height = game_map->height;
-	
-	if (tile % width > 0)
-		output_list.push_back(tile - 1);
-	if (tile % width < width - 1)
-		output_list.push_back(tile + 1);
-	if (tile / width >= 1)
-		output_list.push_back(tile - width);
-	if (tile / width <= height - 1)
-		output_list.push_back(tile + width);
-	return output_list;
+	tile_info.insert({capital, new Tile(100)});
 }
 
 std::vector<GameEvent> Civilization::addAdjTiles(Map* game_map, uint16_t seed_effect) {
@@ -39,7 +22,7 @@ std::vector<GameEvent> Civilization::addAdjTiles(Map* game_map, uint16_t seed_ef
 	std::srand(std::time({}) + seed_effect);
 	std::vector<uint32_t> temp_tiles = {};
 	for (uint32_t tile : owned_tiles) {
-		std::vector<uint32_t> adj_tiles = getAdjacentTiles(tile, game_map);	
+		std::vector<uint32_t> adj_tiles = game_map->getAdjacentTiles(tile, game_map);	
 		temp_tiles.insert(temp_tiles.end(), adj_tiles.begin(), adj_tiles.end());
 	}
 	uint32_t i = 0;

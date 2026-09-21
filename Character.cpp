@@ -19,6 +19,8 @@ Character::Character(uint32_t set_location, uint32_t date[3], Character* set_par
 	date_of_birth[1] = date[1];
 	date_of_birth[2] = date[2];
 }
-void Character::perDay() {
-
+void Character::initializeDecisionTypes() {
+	for (uint16_t i = 0; i != TEMP_DECISION_TYPE_END; i++) {
+		decisions_per_type[static_cast<DecisionType>(i)] = {};	
+	}
 }

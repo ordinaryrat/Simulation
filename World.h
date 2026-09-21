@@ -18,10 +18,10 @@ struct World {
 		game_map = &input_game_map;	
 	}
 
-	std::vector<GameEvent> incrementDate(); 
+	std::vector<GameEvent*> incrementDate(); 
 	
-	std::vector<GameEvent> processCivilization(Civilization* this_civ); 
-	std::vector<GameEvent> processCharacter(Character* this_char); 
+	std::vector<GameEvent*> processCivilization(Civilization* this_civ); 
+	std::vector<GameEvent*> processCharacter(Civilization* this_civ, Character* this_char); 
 	
 	std::map<int, Civilization*> civ_look_up_table = {};
 

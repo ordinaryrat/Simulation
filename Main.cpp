@@ -54,6 +54,7 @@ enum map_type {
 	TEMPERATURE,
 	PRECIPITATION,
 	ELEVATION,
+	TILE_FERTILITY,
 };
 
 enum layer_type {
@@ -171,6 +172,9 @@ void loadBaseMap(map_type base_map_type = TERRAIN) {
 			case ELEVATION:
 				this_color = {(int) (game_map.elevation_map[i] * 255.f), (int) (game_map.elevation_map[i] * 255.f), (int) (game_map.elevation_map[i] * 255.f)};
 				break;
+			case TILE_FERTILITY:
+				this_color = {0, (int) (game_map.fertility_map[i] * 255.f), 0};
+				break;
 		}
 
 		base_map_pixels[(i * 4) + 0] = std::get<0>(this_color);
@@ -220,7 +224,7 @@ std::vector<SelectionPanel*>* selection_panels[2] = {&left_selection_panels, &bo
 
 sf::RectangleShape modify_line({3.f, 20.f});
 
-SelectionPanel left_panel_selection(30, 30, "Map Type", {"Terrain", "Land", "Temperature", "Precipitation", "Elevation"}, font, 20, MAP_TYPE, RADIO);
+SelectionPanel left_panel_selection(30, 30, "Map Type", {"Terrain", "Land", "Temperature", "Precipitation", "Elevation", "Land Fertility"}, font, 20, MAP_TYPE, RADIO);
 SelectionPanel civilization_selection(30, 220, "Base Layer", {"None", "Cultures", "Civilizations", "Religions", "Governments"}, font, 20, MAP_LAYER, RADIO, 2);		
 SelectionPanel modification_civ_panel(30, height - 140, "Modify Civilizations", {"Add Civilization", "Paint Borders", "Modify Civilization", "Remove Civilization"}, font, 20, MOD_CIV, RADIO);
 SelectionPanel modification_terrain_panel(30, height - 140, "Modify Terrain", {"Draw Land", "Modify Elevation", "Modify Heat", "Modify Precipitation"}, font, 20, MOD_TERRAIN, RADIO);
@@ -298,9 +302,10 @@ bool paused = true;
 bool active_window = true;
 
 
-void processEvents(std::vector<GameEvent> events) {
+void processEvents(std::vector<GameEvent*> events) {
 	bool update_top_layer_texture = false;
-	for (GameEvent event : events) {
+	for (GameEvent* event_p : events) {
+		GameEvent event = *event_p;
 		switch (event.type) {
 			case (LAND_TAKEN): {
 				Civilization* related_civ = game_world.civ_look_up_table[event.related_civ_id];
@@ -312,8 +317,23 @@ void processEvents(std::vector<GameEvent> events) {
 					update_top_layer_texture = true;
 				}
 				game_world.tiles_look_up_table.insert_or_assign(event.para1, related_civ);
+				break;
+			}
+			case (LAND_LOST): {
+				Civilization* related_civ = game_world.civ_look_up_table[event.related_civ_id];
+				if (current_top_layer_view == 2) {
+					top_layer_pixels[(event.para1 * 4) + 0] = 0;
+					top_layer_pixels[(event.para1 * 4) + 1] = 0;
+					top_layer_pixels[(event.para1 * 4) + 2] = 0;
+					top_layer_pixels[(event.para1 * 4) + 3] = 0;
+					update_top_layer_texture = true;
+				}
+				game_world.tiles_look_up_table.erase(game_world.tiles_look_up_table.find(event.para1));
+				break;
 			}
 		}
+		std::cout << "freeing :" << event_p << std::endl;
+		free(event_p);
 	}
 	if (update_top_layer_texture) {
 		top_layer_texture.update(top_layer_pixels.data());
@@ -671,13 +691,14 @@ int main(int argc, char** argv) {
 									std::tuple<uint8_t, uint8_t, uint8_t> hex_color_value = *(color_input_field.getColorValue());
 									
 									int civ_id = game_world.next_civ_id;
-									Civilization* temp_civ = new Civilization(civ_id, name, hex_color_value, leader);
+									Civilization* temp_civ = new Civilization(civ_id, name, hex_color_value, leader, i, game_world.game_map);
+									
 									temp_civ->owned_tiles.push_back(i);
 
 									game_world.civilizations.push_back(temp_civ);
 									game_world.civ_look_up_table.insert({civ_id, temp_civ});	
 									
-									processEvents({GameEvent(LAND_TAKEN, i, civ_id)});
+									processEvents({new GameEvent(LAND_TAKEN, i, civ_id)});
 									current_mouse_state = REGULAR;
 									game_world.next_civ_id++;
 									
@@ -693,7 +714,7 @@ int main(int argc, char** argv) {
 										break;
 									}
 									if (game_world.tiles_look_up_table[i] != this_civ) {
-										processEvents({GameEvent(LAND_TAKEN, i, this_civ->id)});
+										processEvents({new GameEvent(LAND_TAKEN, i, this_civ->id)});
 										this_civ->owned_tiles.push_back(i);
 									}
 									right_panel_locked = false;
@@ -741,7 +762,8 @@ int main(int argc, char** argv) {
 		if (!paused)
 			date_advance_time += dt.asSeconds();
 		if (date_advance_time > time_until_date_advance) {
-			processEvents(game_world.incrementDate());
+			std::vector<GameEvent*> game_events = game_world.incrementDate();
+			processEvents(game_events);
 			date_advance_time = 0.f;
 		}
 		
