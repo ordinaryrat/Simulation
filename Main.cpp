@@ -57,6 +57,12 @@ enum map_type {
 	TILE_FERTILITY,
 };
 
+enum ViewType {
+	TILE,
+	COUNTRY,
+	CHARACTER
+};
+
 enum layer_type {
 	NONE,
 	CULTURES,
@@ -114,6 +120,8 @@ uint16_t height = 600;
 uint16_t map_width = 700;
 uint16_t map_height = 700;
 
+bool temperature_needs_update = false;
+
 std::vector<Button*> bottom_panel_buttons = {};
 std::vector<uint8_t> base_map_pixels(map_width * map_height * 4);
 std::vector<uint8_t> top_layer_pixels(map_width * map_height * 4);
@@ -127,6 +135,28 @@ bool right_panel_on = false;
 bool right_panel_locked = false;
 sf::Vector2f locked_panel_position = {0.f, 0.f};
 	
+struct InfoPanel {
+	ViewType type;
+	
+	Tile* tile;
+	Civilization* civilization;
+	Character* character;
+
+	InfoPanel() {
+
+	};
+	InfoPanel(Tile* set_tile_viewed) {
+		type = TILE;
+		tile = set_tile_viewed;
+	};
+};
+
+bool center_interface_open = false;
+InfoPanel center_interface;
+sf::Text center_interface_text(font, "", 18);
+
+
+
 sf::Sprite base_map(base_map_texture);
 sf::Sprite top_layer_map(top_layer_texture);
 
@@ -347,6 +377,20 @@ void processEvents(std::vector<GameEvent*> events) {
 				//game_world.tiles_look_up_table.insert_or_assign(event.para1, related_civ);
 				break;
 			}
+			case (TEMP_CHANGE): {
+				if (current_map_view == 2) {
+					loadBaseMap(TEMPERATURE);
+					base_map_texture.update(base_map_pixels.data());
+				}
+				break;
+			}
+			case (TERRAIN_CHANGE): {
+				if (current_map_view == 0) {
+					loadBaseMap(TERRAIN);
+					base_map_texture.update(base_map_pixels.data());
+				}
+				break;
+			}
 		}
 		free(event_p);
 	}
@@ -418,6 +462,12 @@ int main(int argc, char** argv) {
 	right_panel.setOutlineThickness(3.f);
 	right_panel.setPosition({width - 200.f, 0.f});
 	
+	sf::RectangleShape center_interface_panel({100.f, 100.f}); 
+	center_interface_panel.setFillColor(sf::Color(100,100,100));
+	center_interface_panel.setOutlineColor(sf::Color(200, 200, 200));
+	center_interface_panel.setOutlineThickness(3.f);
+	center_interface_panel.setPosition({width/2.f - 50.f, height/2.f - 50.f});
+	
 	sf::RectangleShape date_panel({300.f, 30.f}); 
 	date_panel.setFillColor(sf::Color(100,100,100));
 	date_panel.setOutlineColor(sf::Color(200, 200, 200));
@@ -431,6 +481,8 @@ int main(int argc, char** argv) {
 	year_date_text.setPosition({width/2.f - 140.f, 10.f});
 	month_date_text.setPosition({width/2.f - 70.f, 10.f});
 	time_speed_text.setPosition({width/2.f + 95.f, 10.f});
+	
+	center_interface_text.setPosition({width/2.f - 50.f, height/2.f - 50.f});
 
 	// Will need to be more flexible in the future. 
 	left_selection_panels.push_back(&left_panel_selection);
@@ -620,6 +672,9 @@ int main(int argc, char** argv) {
 				
 				date_panel.setPosition({width/2.f - 150.f, 0.f});
 				
+				center_interface_panel.setPosition({width/2.f - 50.f, height/2.f - 50.f});
+				center_interface_text.setPosition({width/2.f - 50.f, height/2.f - 50.f});
+				
 				year_date_text.setPosition({width/2.f - 140.f, 10.f});
 				month_date_text.setPosition({width/2.f - 60.f, 10.f});
 				time_speed_text.setPosition({width/2.f + 80.f, 10.f});
@@ -714,7 +769,7 @@ int main(int argc, char** argv) {
 									std::tuple<uint8_t, uint8_t, uint8_t> hex_color_value = *(color_input_field.getColorValue());
 									
 									int civ_id = game_world.next_civ_id;
-									Civilization* temp_civ = new Civilization(civ_id, name, hex_color_value, leader, i, game_world.game_map);
+									Civilization* temp_civ = new Civilization(civ_id, name, hex_color_value, leader, i, game_world.game_map, culture);
 
 									game_world.civilizations.push_back(temp_civ);
 									game_world.civ_look_up_table.insert({civ_id, temp_civ});	
@@ -748,6 +803,14 @@ int main(int argc, char** argv) {
 						} else {
 							if (locked_panel_position == world_pos) {
 								// Open interface for this pixel?
+								if (game_world.tiles_look_up_table.find(i) != game_world.tiles_look_up_table.end()) {
+									Civilization* this_civ = game_world.tiles_look_up_table[i]; 
+									center_interface_open = true;
+									Tile* this_tile = this_civ->tile_info[i];
+									center_interface = InfoPanel(this_tile);
+								} else {
+									center_interface_open = false;
+								}
 							} else {
 								right_panel_locked = true;
 								locked_panel_position = world_pos; 
@@ -814,7 +877,9 @@ int main(int argc, char** argv) {
 			time_speed_text.setString("Paused");	
 		else
 			time_speed_text.setString(formatSigFigs(std::to_string(2.f/time_until_date_advance)) + 'x');
-        window.clear();
+        
+		window.clear();
+		
         if (active_window) {
 			if (currently_selected_input_field == NULL) {
 				if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::D))
@@ -885,7 +950,7 @@ int main(int argc, char** argv) {
 							continue;
 					}
 					int i = ((int)world_pos.y * map_width) + (int)world_pos.x;
-					std::string temp_build_string = "(" + std::to_string((int)world_pos.x) + ", " + std::to_string((int)world_pos.y) + ")" + "\nTerrain: " + terrain_names[game_map.terrain_map[i]];
+					std::string temp_build_string = "(" + std::to_string((int)world_pos.x) + ", " + std::to_string((int)world_pos.y) + ")" + "\nTerrain: " + terrain_names[game_map.terrain_map[i]] + "\ntemperature:\n " + std::to_string((int)game_world.game_map->temperature_map[i]);
 					right_panel_on = true;
 					
 					if (game_world.tiles_look_up_table.count(i) == 1) {
@@ -1031,6 +1096,13 @@ int main(int argc, char** argv) {
 				}
 			}
 		}	
+		if (center_interface_open) {
+			window.draw(center_interface_panel);
+			if (center_interface.type == TILE) {
+				center_interface_text.setString("Population: " + std::to_string(center_interface.tile->population));
+				window.draw(center_interface_text);
+			}
+		}
 		window.display();
 	}
 	

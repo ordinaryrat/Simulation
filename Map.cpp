@@ -1,6 +1,8 @@
 #include "Map.h"
 #include "Simplex.h"
 #include <vector>
+#include <algorithm>
+#include <iterator>
 
 float Map::fastAbs(float input) {
 	if (input > 0.f) {
@@ -10,13 +12,16 @@ float Map::fastAbs(float input) {
 	}
 }
 
-Map::Map(uint16_t input_width, uint16_t input_height, float land_factor, float max_temp, float min_temp) {
+Map::Map(uint16_t input_width, uint16_t input_height, float i_land_factor, float max_temp, float min_temp) {
+	land_factor = i_land_factor;
+
 	width = input_width;
 	height = input_height;
 
 	land_map = new bool[input_width * input_height];
 	terrain_map = new terrain[input_width * input_height];
 	temperature_map = new float[input_width * input_height];
+	equ_temperature_map = new float[input_width * input_height];
 	fertility_map = new float[input_width * input_height];
 	devastation_map = (float*)calloc(input_width * input_height, sizeof(float));
 
@@ -40,6 +45,7 @@ Map::Map(uint16_t input_width, uint16_t input_height, float land_factor, float m
 				temp_temperature = (temp_temperature + ((max_temp + min_temp) * 0.5 * 1))/2;
 			
 			temperature_map[i] = temp_temperature;
+			equ_temperature_map[i] = temp_temperature;
 
 			precipitation_map = factor_precipitation_map.grid;
 			elevation_map = temp_elevation_map.grid;

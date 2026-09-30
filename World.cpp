@@ -162,6 +162,20 @@ std::vector<GameEvent*> World::incrementDate() {
 		std::vector<GameEvent*> civ_events = processCivilization(civilizations[i]);
 		return_events.insert(return_events.end(), civ_events.begin(), civ_events.end());
 	}
+
+	uint16_t day_of_year = 0;
+	for (uint8_t i = 0; i < date[1]; i++) {
+		day_of_year += lengths_of_months[i];
+	}
+	if (date[0] % 4 == 0 && date[1] > 1) {
+		day_of_year++;
+	}
+	day_of_year += date[2];
+
+	float temperature_modifier = 30.f * (0.5f - fastAbs(day_of_year/365.f - 0.5f));	
+
+	bool do_terrain_change = false;
+	
 	for (uint32_t i = 0; i < game_map->width * game_map->height; i++) {
 		if (game_map->devastation_map[i] != 0.f) {
 			game_map->devastation_map[i] -= 0.01f;
@@ -169,8 +183,66 @@ std::vector<GameEvent*> World::incrementDate() {
 				game_map->devastation_map[i] = 0.f;
 			}
 		}
-	}
+		game_map->temperature_map[i] = game_map->equ_temperature_map[i] + temperature_modifier;
+	
+		if (!game_map->land_map[i]) {
+			if (game_map->terrain_map[i] != ICE && game_map->temperature_map[i] < 0) {
+				game_map->terrain_map[i] = ICE;
+				do_terrain_change = true;
+			}
+			else {
+				if (game_map->terrain_map[i] == ICE && game_map->temperature_map[i] >= 0) {
+					if (game_map->elevation_map[i] < (1 - game_map->land_factor * 2)) {
+						game_map->terrain_map[i] = OCEAN;
+						do_terrain_change = true;
+					} else if (game_map->elevation_map[i] < (1 - game_map->land_factor * 1.2)) {
+						game_map->terrain_map[i] = SEA;
+						do_terrain_change = true;
+					} else if (game_map->elevation_map[i] < (1 - game_map->land_factor)) {
+						game_map->terrain_map[i] = COASTAL;
+						do_terrain_change = true;
+					}
+				}
+			}
+		} else {
 
+			if (game_map->temperature_map[i] < 0) {
+				game_map->terrain_map[i] = ARCTIC;
+				continue;
+			}
+
+			if (game_map->precipitation_map[i] < 0.2) {
+				if (game_map->temperature_map[i] < 15)
+					game_map->terrain_map[i] = TUNDRA;
+				else
+					game_map->terrain_map[i] = DESERT;
+				continue;
+			}
+			if (game_map->precipitation_map[i] < 0.4) {
+				if (game_map->temperature_map[i] < 12) 
+					game_map->terrain_map[i] = TUNDRA;
+				else 
+					game_map->terrain_map[i] = PLAINS;
+				continue;
+			}
+			if (game_map->precipitation_map[i] < 0.8) {
+				if (game_map->temperature_map[i] < 8)
+					game_map->terrain_map[i] = TUNDRA;
+				else 
+					game_map->terrain_map[i] = GRASSLAND;
+				continue;
+			}
+			if (game_map->temperature_map[i] < 25)
+				game_map->terrain_map[i] = GRASSLAND;
+			else 
+				game_map->terrain_map[i] = JUNGLE;
+		}
+	}
+	
+	return_events.push_back(new GameEvent(TEMP_CHANGE));
+	if (do_terrain_change) {
+		return_events.push_back(new GameEvent(TERRAIN_CHANGE));
+	}
 	return return_events;
 }
 
@@ -179,4 +251,12 @@ int World::fastFloor(float x) {
 		return (int)x;
 	else
 		return (int)x - 1;
+}
+
+float World::fastAbs(float input) {
+	if (input > 0.f) {
+		return input;
+	} else {
+		return input * -1.f;
+	}
 }

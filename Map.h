@@ -21,12 +21,17 @@ enum terrain {
 
 class Map {
 	public:
+		float land_factor;
+
 		uint16_t width;
 		uint16_t height;
 		
 		bool* land_map; // Stores if the tile is a land tile.
 		float* elevation_map;
+
+		float* equ_temperature_map;
 		float* temperature_map;
+		
 		float* precipitation_map;
 		float* fertility_map;
 		

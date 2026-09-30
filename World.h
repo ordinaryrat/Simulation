@@ -23,6 +23,7 @@ struct World {
 	std::vector<GameEvent*> processCivilization(Civilization* this_civ); 
 	std::vector<GameEvent*> processCharacter(Civilization* this_civ, Character* this_char); 
 	int fastFloor(float x);
+	float fastAbs(float x);
 
 	std::map<int, Civilization*> civ_look_up_table = {};
 

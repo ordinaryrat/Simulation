@@ -5,7 +5,7 @@
 #include "Event.h"
 #include <vector>
 
-Civilization::Civilization(int civ_id, std::string input_name, std::tuple<uint8_t, uint8_t, uint8_t> input_color, Character* leader, uint32_t capital, Map* game_map) {
+Civilization::Civilization(int civ_id, std::string input_name, std::tuple<uint8_t, uint8_t, uint8_t> input_color, Character* leader, uint32_t capital, Map* game_map, Culture* set_culture) {
 	// I don't think these parameters should be permanent.
 	id = civ_id;
 	name = input_name;
@@ -14,7 +14,9 @@ Civilization::Civilization(int civ_id, std::string input_name, std::tuple<uint8_
 	// Assuming randomly generating government and it is a MIGRATORY tribe.
 	government = new Government(leader, MIGRATORY, capital);
 	characters.push_back(leader);
-	tile_info.insert({capital, new Tile(100)});
+
+	culture = set_culture;
+	tile_info.insert({capital, new Tile(100, culture)});
 	owned_tiles.push_back(capital);
 	tribal_land.push_back(capital);
 }
