@@ -6,6 +6,7 @@
 #include "Map.h"
 #include "Civilization.h"
 #include "Character.h"
+#include "Tile.h"
 
 struct World {
 	Map* game_map;

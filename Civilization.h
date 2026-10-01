@@ -4,11 +4,11 @@
 #include <string>
 #include <cstdint>
 #include <vector>
-#include "Map.h"
 #include "Event.h"
 #include "Culture.h"
 #include "Character.h"
 #include "Government.h"
+#include "Map.h"
 
 struct TechnologyType {
 
@@ -31,30 +31,12 @@ struct PopulationMember {
 };
 */
 
-struct Tile {
-	uint32_t population;	
-	
-	uint32_t starving_population;
-
-	std::map<Culture*, uint32_t> cultures;
-	std::map<uint8_t, uint32_t> ages;
-
-	Tile(uint32_t set_population, Culture* culture) {
-		/*for (uint32_t i = 0; i < set_population; i++) {
-			population.push_back();
-		}*/
-		population = set_population;
-	}
-};
-
 struct Civilization {
 	int id;
 
 	std::string name;
 	std::vector<uint32_t> owned_tiles;
 	std::vector<uint32_t> tribal_land;
-		
-	std::map<uint32_t, Tile*> tile_info;
 	
 	std::map<TechnologyType, uint8_t> tech_levels;
 

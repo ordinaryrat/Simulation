@@ -1,8 +1,6 @@
 #ifndef GAMEEVENT_H
 #define GAMEEVENT_H
 
-#include "Map.h"
-
 // Game Events are sent over and signify visual changes. These can also be used to notify player of stuff.
 
 enum event_type {
@@ -11,6 +9,7 @@ enum event_type {
 	LAND_BECOME_TRIBAL,
 	TEMP_CHANGE,
 	TERRAIN_CHANGE,
+	FERTILITY_CHANGE,
 };
 
 struct GameEvent {
@@ -19,7 +18,6 @@ struct GameEvent {
 	uint32_t para2 = 0;
 	uint32_t related_tile = 0;
 	int related_civ_id = 0;
-	terrain related_terrain = ARCTIC;
 
 	GameEvent(event_type new_type, uint32_t i_para1 = 0, int i_related_civ_id = 0) {
 		type = new_type;

@@ -6,6 +6,7 @@
 
 std::vector<GameEvent*> World::processCivilization(Civilization* this_civ) {
 	std::vector<GameEvent*> return_events = {};
+	/*
 	for (uint16_t c = 0; c < this_civ->characters.size(); c++) {
 		std::vector<GameEvent*> temp_list = processCharacter(this_civ, this_civ->characters[c]);
 		return_events.insert(return_events.end(), temp_list.begin(), temp_list.end());
@@ -14,8 +15,9 @@ std::vector<GameEvent*> World::processCivilization(Civilization* this_civ) {
 	// These should become parameters.
 	float birth_rate = 0.2f;
 	float death_rate = 0.1f;
+
 	for (uint32_t i = 0; i < this_civ->owned_tiles.size(); i++) {
-		uint32_t this_tile = this_civ->owned_tiles[i];
+		Tile* this_tile = game_map->tiles[this_civ->owned_tiles[i]];
 
 		game_map->devastation_map[this_tile] += this_civ->tile_info[this_tile]->population * 0.0001f;
 		
@@ -57,11 +59,13 @@ std::vector<GameEvent*> World::processCivilization(Civilization* this_civ) {
 			}
 		}
 	}
+	*/
 	return return_events;
 }
 std::vector<GameEvent*> World::processCharacter(Civilization* this_civ, Character* this_char) {
 	std::vector<GameEvent*> return_events = {};
 	
+	/*
 	if (date[1] == this_char->date_of_birth[1] && date[2] == this_char->date_of_birth[2])
 		this_char->age++;
 
@@ -138,6 +142,7 @@ std::vector<GameEvent*> World::processCharacter(Civilization* this_civ, Characte
 	} else {
 
 	}
+	*/
 
 	return return_events;
 }
@@ -172,77 +177,93 @@ std::vector<GameEvent*> World::incrementDate() {
 	}
 	day_of_year += date[2];
 
+	// WEATHER
 	float temperature_modifier = 30.f * (0.5f - fastAbs(day_of_year/365.f - 0.5f));	
 
 	bool do_terrain_change = false;
 	
 	for (uint32_t i = 0; i < game_map->width * game_map->height; i++) {
-		if (game_map->devastation_map[i] != 0.f) {
-			game_map->devastation_map[i] -= 0.01f;
-			if (game_map->devastation_map[i] < 0.f) {
-				game_map->devastation_map[i] = 0.f;
+		Tile* this_tile = game_map->tiles[i];
+
+		if (this_tile->devastation != 0.f) {
+			this_tile->devastation -= 0.01f;
+			if (this_tile->devastation < 0.f) {
+				this_tile->devastation = 0.f;
 			}
 		}
-		game_map->temperature_map[i] = game_map->equ_temperature_map[i] + temperature_modifier;
+		this_tile->temperature = this_tile->equ_temperature + temperature_modifier;
 	
-		if (!game_map->land_map[i]) {
-			if (game_map->terrain_map[i] != ICE && game_map->temperature_map[i] < 0) {
-				game_map->terrain_map[i] = ICE;
+		if (!this_tile->land) {
+			if (this_tile->terrain != ICE && this_tile->temperature < 0) {
+				this_tile->terrain = ICE;
 				do_terrain_change = true;
 			}
 			else {
-				if (game_map->terrain_map[i] == ICE && game_map->temperature_map[i] >= 0) {
-					if (game_map->elevation_map[i] < (1 - game_map->land_factor * 2)) {
-						game_map->terrain_map[i] = OCEAN;
+				if (this_tile->terrain == ICE && this_tile->temperature >= 0) {
+					if (this_tile->elevation < (1 - game_map->land_factor * 2)) {
+						this_tile->terrain = OCEAN;
 						do_terrain_change = true;
-					} else if (game_map->elevation_map[i] < (1 - game_map->land_factor * 1.2)) {
-						game_map->terrain_map[i] = SEA;
+					} else if (this_tile->elevation < (1 - game_map->land_factor * 1.2)) {
+						this_tile->terrain = SEA;
 						do_terrain_change = true;
-					} else if (game_map->elevation_map[i] < (1 - game_map->land_factor)) {
-						game_map->terrain_map[i] = COASTAL;
+					} else if (this_tile->elevation < (1 - game_map->land_factor)) {
+						this_tile->terrain = COASTAL;
 						do_terrain_change = true;
 					}
 				}
 			}
 		} else {
-
-			if (game_map->temperature_map[i] < 0) {
-				game_map->terrain_map[i] = ARCTIC;
+			float c1 = (fastAbs(0.8f - this_tile->precipitation)/0.8f) * (fastAbs(0.8f - this_tile->precipitation)/0.8f);
+			float c2 = fastAbs(26.f - this_tile->temperature)/26.f;
+			this_tile->fertility = 1.f - (c1+c2);
+			if (this_tile->fertility < 0) {
+				this_tile->fertility = 0;
+			}
+			
+			if (this_tile->elevation > 0.95) {
+				this_tile->terrain = MOUNTAIN;
 				continue;
 			}
 
-			if (game_map->precipitation_map[i] < 0.2) {
-				if (game_map->temperature_map[i] < 15)
-					game_map->terrain_map[i] = TUNDRA;
+			if (this_tile->temperature < 0) {
+				this_tile->terrain = ARCTIC;
+				continue;
+			}
+
+			if (this_tile->precipitation < 0.2) {
+				if (this_tile->temperature < 15)
+					this_tile->terrain = TUNDRA;
 				else
-					game_map->terrain_map[i] = DESERT;
+					this_tile->terrain = DESERT;
 				continue;
 			}
-			if (game_map->precipitation_map[i] < 0.4) {
-				if (game_map->temperature_map[i] < 12) 
-					game_map->terrain_map[i] = TUNDRA;
+			if (this_tile->precipitation < 0.4) {
+				if (this_tile->temperature < 12) 
+					this_tile->terrain = TUNDRA;
 				else 
-					game_map->terrain_map[i] = PLAINS;
+					this_tile->terrain = PLAINS;
 				continue;
 			}
-			if (game_map->precipitation_map[i] < 0.8) {
-				if (game_map->temperature_map[i] < 8)
-					game_map->terrain_map[i] = TUNDRA;
+			if (this_tile->precipitation < 0.8) {
+				if (this_tile->temperature < 8)
+					this_tile->terrain = TUNDRA;
 				else 
-					game_map->terrain_map[i] = GRASSLAND;
+					this_tile->terrain = GRASSLAND;
 				continue;
 			}
-			if (game_map->temperature_map[i] < 25)
-				game_map->terrain_map[i] = GRASSLAND;
+			if (this_tile->temperature < 25)
+				this_tile->terrain = GRASSLAND;
 			else 
-				game_map->terrain_map[i] = JUNGLE;
+				this_tile->terrain = JUNGLE;
 		}
 	}
 	
 	return_events.push_back(new GameEvent(TEMP_CHANGE));
+	return_events.push_back(new GameEvent(FERTILITY_CHANGE));
 	if (do_terrain_change) {
 		return_events.push_back(new GameEvent(TERRAIN_CHANGE));
 	}
+	
 	return return_events;
 }
 

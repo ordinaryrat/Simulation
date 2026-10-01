@@ -16,7 +16,7 @@ Civilization::Civilization(int civ_id, std::string input_name, std::tuple<uint8_
 	characters.push_back(leader);
 
 	culture = set_culture;
-	tile_info.insert({capital, new Tile(100, culture)});
+	//tile_info.insert({capital, new Tile(100, culture)});
 	owned_tiles.push_back(capital);
 	tribal_land.push_back(capital);
 }

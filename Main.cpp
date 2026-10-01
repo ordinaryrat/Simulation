@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "Map.h"
+#include "Tile.h"
 #include "UIElements.h"
 #include "World.h"
 #include "Civilization.h"
@@ -16,7 +17,7 @@
 	
 sf::Font font("media/Courier.ttf");
 
-std::map<terrain, std::tuple<uint8_t, uint8_t, uint8_t>> terrain_colors = {
+std::map<Terrain, std::tuple<uint8_t, uint8_t, uint8_t>> terrain_colors = {
 	{OCEAN, std::tuple(0, 0, 255)},
 	{SEA, std::tuple(10, 40, 200)},
 	{COASTAL, std::tuple(40, 80, 160)},
@@ -29,7 +30,7 @@ std::map<terrain, std::tuple<uint8_t, uint8_t, uint8_t>> terrain_colors = {
 	{ICE, std::tuple(220, 220, 250)},
 	{TUNDRA, std::tuple(184, 170, 138)},
 };
-std::map<terrain, std::string> terrain_names = {
+std::map<Terrain, std::string> terrain_names = {
 	{OCEAN, "Ocean"},
 	{SEA, "Sea"},
 	{COASTAL, "Coastal"},
@@ -48,7 +49,7 @@ enum MouseState {
 	MAP_ADD	
 };
 
-enum map_type {
+enum MapType {
 	TERRAIN,
 	LAND,
 	TEMPERATURE,
@@ -117,8 +118,8 @@ Button add_to_map_button(add_to_map_texture, ADD_TO_MAP);
 uint16_t width = 600;
 uint16_t height = 600;
 
-uint16_t map_width = 700;
-uint16_t map_height = 700;
+uint16_t map_width = 600;
+uint16_t map_height = 500;
 
 bool temperature_needs_update = false;
 
@@ -139,15 +140,18 @@ struct InfoPanel {
 	ViewType type;
 	
 	Tile* tile;
+	sf::Vector2f tile_pos = {0.f, 0.f};
+
 	Civilization* civilization;
 	Character* character;
 
 	InfoPanel() {
 
 	};
-	InfoPanel(Tile* set_tile_viewed) {
+	InfoPanel(Tile* set_tile_viewed, sf::Vector2f set_tile_pos) {
 		type = TILE;
 		tile = set_tile_viewed;
+		tile_pos = set_tile_pos;
 	};
 };
 
@@ -163,24 +167,26 @@ sf::Sprite top_layer_map(top_layer_texture);
 MouseState current_mouse_state = REGULAR;
 // We will probably need to seperate different pixel layers. Like one called base map and then a map for others.
 
-void loadBaseMap(map_type base_map_type = TERRAIN) {
+void loadBaseMap(MapType base_MapType = TERRAIN) {
 	// Loading bottom map component.
 	base_map_pixels = {};
 	for (uint32_t i = 0; i < map_width * map_height; i++) {
 		std::tuple<uint8_t, uint8_t, uint8_t> this_color;
-		switch (base_map_type) {
+		Tile* this_tile = game_world.game_map->tiles[i];
+		
+		switch (base_MapType) {
 			case TERRAIN:
-				this_color = terrain_colors[game_map.terrain_map[i]];
+				this_color = terrain_colors[this_tile->terrain];
 				break;
 			case LAND:
-				if (game_map.land_map[i])
+				if (this_tile->land)
 					this_color = {200, 200, 0};
 				else
 					this_color = {0, 0, 200};
 				break;
 			case TEMPERATURE: {
 				// Maybe a key for colors would be nice.
-				float this_temp = game_map.temperature_map[i]; 
+				float this_temp = this_tile->temperature; 
 				float r = (255 * (this_temp + 100.f) * 0.004f);
 				float b = (255 * (1 - (this_temp + 100.f) * 0.004f));
 				
@@ -198,13 +204,13 @@ void loadBaseMap(map_type base_map_type = TERRAIN) {
 				break;
 			}
 			case PRECIPITATION:
-				this_color = {0, 0, (int) (game_map.precipitation_map[i] * 255.f)};
+				this_color = {0, 0, (int) (this_tile->precipitation * 255.f)};
 				break;
 			case ELEVATION:
-				this_color = {(int) (game_map.elevation_map[i] * 255.f), (int) (game_map.elevation_map[i] * 255.f), (int) (game_map.elevation_map[i] * 255.f)};
+				this_color = {(int) (this_tile->elevation * 255.f), (int) (this_tile->elevation * 255.f), (int) (this_tile->elevation * 255.f)};
 				break;
 			case TILE_FERTILITY:
-				this_color = {0, (int) (game_map.fertility_map[i] * 255.f), 0};
+				this_color = {0, (int) (this_tile->fertility * 255.f), 0};
 				break;
 		}
 
@@ -262,17 +268,22 @@ SelectionPanel modification_terrain_panel(30, height - 140, "Modify Terrain", {"
 
 InputField civilization_name_field(font, 300, height - 80, 100, 20, "Name", STRING, "name");
 InputField color_input_field(font, 450, height - 80, 100, 20, "Color", COLOR, "#000000");
-InputField select_civilization_field(font, 300, height - 80, 100, 20, "Which", INTEGER, "0"); // TODO should be a drop down bar
+InputField select_civilization_field(font, 300, height - 80, 100, 20, "Equilibrum Temperature", INTEGER, "0"); // TODO should be a drop down bar
+
+InputField tile_equ_temperature_field(font, width/2.f - 5.f, height/2.f - 100.f, 100, 20, "", INTEGER, "0"); // TODO should be a drop down bar
 
 std::vector<InputField*> modification_input_fields = {};
-std::vector<InputField*>* input_fields[1] = {&modification_input_fields};
+std::vector<InputField*> center_interface_fields = {};
+
+std::vector<InputField*>* input_fields[2] = {&modification_input_fields, &center_interface_fields};
+
 
 InputField* currently_selected_input_field = NULL;
 
 void clickOnPanel(selection_panel_id panel_id, uint8_t option_pressed) {
 	switch (panel_id) {
 		case (MAP_TYPE):
-			loadBaseMap(static_cast<map_type>(option_pressed)); // Corresponds to enum;
+			loadBaseMap(static_cast<MapType>(option_pressed)); // Corresponds to enum;
 			base_map_texture.update(base_map_pixels.data());
 			current_map_view = option_pressed;
 			break;
@@ -391,12 +402,25 @@ void processEvents(std::vector<GameEvent*> events) {
 				}
 				break;
 			}
+			case (FERTILITY_CHANGE): {
+				if (current_map_view == 5) {
+					loadBaseMap(TILE_FERTILITY);
+					base_map_texture.update(base_map_pixels.data());
+				}
+				break;
+			}
 		}
 		free(event_p);
 	}
 	if (update_top_layer_texture) {
 		top_layer_texture.update(top_layer_pixels.data());
 		top_layer_map.setTexture(top_layer_texture);
+	}
+}
+
+void inputFieldModify() {
+	if (currently_selected_input_field == &tile_equ_temperature_field) {
+		center_interface.tile->equ_temperature = tile_equ_temperature_field.getNumber();	
 	}
 }
 
@@ -462,11 +486,11 @@ int main(int argc, char** argv) {
 	right_panel.setOutlineThickness(3.f);
 	right_panel.setPosition({width - 200.f, 0.f});
 	
-	sf::RectangleShape center_interface_panel({100.f, 100.f}); 
+	sf::RectangleShape center_interface_panel({300.f, 300.f}); 
 	center_interface_panel.setFillColor(sf::Color(100,100,100));
 	center_interface_panel.setOutlineColor(sf::Color(200, 200, 200));
 	center_interface_panel.setOutlineThickness(3.f);
-	center_interface_panel.setPosition({width/2.f - 50.f, height/2.f - 50.f});
+	center_interface_panel.setPosition({width/2.f - 150.f, height/2.f - 150.f});
 	
 	sf::RectangleShape date_panel({300.f, 30.f}); 
 	date_panel.setFillColor(sf::Color(100,100,100));
@@ -503,6 +527,7 @@ int main(int argc, char** argv) {
 	sf::FloatRect left_panel_rect = left_panel.getGlobalBounds();
 	sf::FloatRect bottom_panel_rect = bottom_panel.getGlobalBounds();
 	sf::FloatRect right_panel_rect = right_panel.getGlobalBounds();
+	sf::FloatRect center_interface_rect = center_interface_panel.getGlobalBounds();
 
 	// INPUT FIELD
 	modification_input_fields.push_back(&civilization_name_field);
@@ -536,6 +561,7 @@ int main(int argc, char** argv) {
 				if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed>()) {
 					switch (key_pressed->scancode) {
 						case sf::Keyboard::Scancode::Escape:
+							// TODO should escape revert?
 							currently_selected_input_field->formatInput();
 							currently_selected_input_field->setInputText();
 							
@@ -547,6 +573,8 @@ int main(int argc, char** argv) {
 							currently_selected_input_field->formatInput();
 							currently_selected_input_field->setInputText();
 							
+							inputFieldModify();
+
 							currently_selected_input_field->selected = false;
 							currently_selected_input_field = NULL;
 							break;
@@ -625,7 +653,11 @@ int main(int argc, char** argv) {
 					if (keyPressed->scancode == sf::Keyboard::Scancode::Escape) {
 						right_panel_on = false;
 						right_panel_locked = false;
+						
 						current_mouse_state = REGULAR;
+						
+						center_interface_open = false;	
+						center_interface_fields = {};
 					} else if (keyPressed->scancode == sf::Keyboard::Scancode::Space) {
 						paused = !paused;	
 						date_advance_time = 0.f;
@@ -672,8 +704,9 @@ int main(int argc, char** argv) {
 				
 				date_panel.setPosition({width/2.f - 150.f, 0.f});
 				
-				center_interface_panel.setPosition({width/2.f - 50.f, height/2.f - 50.f});
-				center_interface_text.setPosition({width/2.f - 50.f, height/2.f - 50.f});
+				center_interface_panel.setPosition({width/2.f - 150.f, height/2.f - 150.f});
+				center_interface_text.setPosition({width/2.f - 140.f, height/2.f - 140.f});
+				center_interface_rect.position = {width/2.f - 150.f, height/2.f - 150.f};
 				
 				year_date_text.setPosition({width/2.f - 140.f, 10.f});
 				month_date_text.setPosition({width/2.f - 60.f, 10.f});
@@ -696,6 +729,12 @@ int main(int argc, char** argv) {
 				for (InputField* this_field : modification_input_fields) {
 					this_field->top = height - 80.f;
 					this_field->input_field_rect.position.y = height - 80.f;
+				}
+				for (InputField* this_field : center_interface_fields) {
+					this_field->top = height/2.f - 100.f;
+					this_field->left = width/2.f - 5.f;
+					this_field->input_field_rect.position.y = height/2.f - 100.f;
+					this_field->input_field_rect.position.x = width/2.f - 5.f;
 				}
 			}
 			else if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && active_window)
@@ -725,7 +764,7 @@ int main(int argc, char** argv) {
 				}
 				bool click_on_panel = false;
 				bool click_on_input_field = false;
-				if (rectContains(left_panel_rect, mouse_position) || (right_panel_on && rectContains(right_panel_rect, mouse_position)) || rectContains(bottom_panel_rect, mouse_position)) {
+				if (rectContains(left_panel_rect, mouse_position) || (right_panel_on && rectContains(right_panel_rect, mouse_position)) || rectContains(bottom_panel_rect, mouse_position) || (rectContains(center_interface_rect, mouse_position) && center_interface_open)) {
 					// Always assuming input fields appear on these panels.
 					click_on_panel = true;
 					for (std::vector<InputField*>* this_section : input_fields) {
@@ -802,15 +841,17 @@ int main(int argc, char** argv) {
 							}
 						} else {
 							if (locked_panel_position == world_pos) {
-								// Open interface for this pixel?
-								if (game_world.tiles_look_up_table.find(i) != game_world.tiles_look_up_table.end()) {
-									Civilization* this_civ = game_world.tiles_look_up_table[i]; 
-									center_interface_open = true;
-									Tile* this_tile = this_civ->tile_info[i];
-									center_interface = InfoPanel(this_tile);
-								} else {
-									center_interface_open = false;
-								}
+								// Open interface for this pixel/tile
+								center_interface_open = true;
+								center_interface = InfoPanel(game_world.game_map->tiles[i], locked_panel_position);
+								//right_panel_locked = false;
+								
+								// Center interface for tile
+								center_interface_fields = {};
+								center_interface_fields.push_back(&tile_equ_temperature_field);
+							
+								tile_equ_temperature_field.value = std::to_string(game_world.game_map->tiles[i]->equ_temperature);
+								tile_equ_temperature_field.setInputText();
 							} else {
 								right_panel_locked = true;
 								locked_panel_position = world_pos; 
@@ -950,7 +991,7 @@ int main(int argc, char** argv) {
 							continue;
 					}
 					int i = ((int)world_pos.y * map_width) + (int)world_pos.x;
-					std::string temp_build_string = "(" + std::to_string((int)world_pos.x) + ", " + std::to_string((int)world_pos.y) + ")" + "\nTerrain: " + terrain_names[game_map.terrain_map[i]] + "\ntemperature:\n " + std::to_string((int)game_world.game_map->temperature_map[i]);
+					std::string temp_build_string = "(" + std::to_string((int)world_pos.x) + ", " + std::to_string((int)world_pos.y) + ")" + "\nTerrain: " + terrain_names[game_world.game_map->tiles[i]->terrain] + "\ntemperature:\n " + std::to_string((int)game_world.game_map->tiles[i]->temperature);
 					right_panel_on = true;
 					
 					if (game_world.tiles_look_up_table.count(i) == 1) {
@@ -1073,6 +1114,13 @@ int main(int argc, char** argv) {
 			bottom_panel_buttons[i]->button_sprite->setPosition({bottom_panel_buttons[i]->left, bottom_panel_buttons[i]->top});
 			window.draw(*(bottom_panel_buttons[i]->button_sprite));
 		}
+		if (center_interface_open) {
+			window.draw(center_interface_panel);
+			if (center_interface.type == TILE) {
+				center_interface_text.setString("Tile Location: (" + std::to_string((uint32_t)center_interface.tile_pos.x) + ", " + std::to_string((uint32_t)center_interface.tile_pos.y) + ")\nTerrain: " + terrain_names[center_interface.tile->terrain] + "\nEqu. Temp.: ");
+				window.draw(center_interface_text);
+			}
+		}
 		for (std::vector<InputField*>* this_section : input_fields) {
 			for (uint8_t i = 0; i < this_section->size(); i++) {
 				InputField* this_input_field = (*this_section)[i];
@@ -1083,8 +1131,11 @@ int main(int argc, char** argv) {
 				else 
 					this_input_field->input_field->setFillColor({100, 100, 100, 255});
 				
-				this_input_field->title_text->setPosition({this_input_field->left, this_input_field->top - (5 + this_input_field->font_size * 1.25f)});
-				window.draw(*(this_input_field->title_text));
+				if (this_input_field->title.size() > 0) {
+					this_input_field->title_text->setPosition({this_input_field->left, this_input_field->top - (5 + this_input_field->font_size * 1.25f)});
+					window.draw(*(this_input_field->title_text));
+				}
+				
 				this_input_field->input_field->setPosition({this_input_field->left, this_input_field->top});
 				window.draw(*(this_input_field->input_field));
 				this_input_field->input_text->setPosition({this_input_field->left, this_input_field->top});
@@ -1096,13 +1147,6 @@ int main(int argc, char** argv) {
 				}
 			}
 		}	
-		if (center_interface_open) {
-			window.draw(center_interface_panel);
-			if (center_interface.type == TILE) {
-				center_interface_text.setString("Population: " + std::to_string(center_interface.tile->population));
-				window.draw(center_interface_text);
-			}
-		}
 		window.display();
 	}
 	

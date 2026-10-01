@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <iterator>
 
+#include "Tile.h"
+
 float Map::fastAbs(float input) {
 	if (input > 0.f) {
 		return input;
@@ -18,22 +20,18 @@ Map::Map(uint16_t input_width, uint16_t input_height, float i_land_factor, float
 	width = input_width;
 	height = input_height;
 
-	land_map = new bool[input_width * input_height];
-	terrain_map = new terrain[input_width * input_height];
-	temperature_map = new float[input_width * input_height];
-	equ_temperature_map = new float[input_width * input_height];
-	fertility_map = new float[input_width * input_height];
-	devastation_map = (float*)calloc(input_width * input_height, sizeof(float));
-
 	Simplex temp_elevation_map(input_width, input_height, 0.005, 1);
 	Simplex factor_temperature_map(input_width, input_height, 0.02, 2);
 	Simplex factor_precipitation_map(input_width, input_height, 0.01, 3);
 	
-	for (uint16_t x = 0; x < input_width; x++) {
-		for (uint16_t y = 0; y < input_height; y++) {
+	for (uint16_t y = 0; y < input_height; y++) {
+		for (uint16_t x = 0; x < input_width; x++) {
+			Tile* new_tile = new Tile();
+			tiles.push_back(new_tile);
+
 			int i = (y * input_width) + x;
 			
-			land_map[i] = temp_elevation_map.grid[i] > (1 - land_factor);
+			new_tile->land = temp_elevation_map.grid[i] > (1 - land_factor);
 			float temp_temperature = 
 				max_temp - 
 				(((4.0*(y - input_height/2.0)*(y - input_height/2.0))
@@ -41,77 +39,77 @@ Map::Map(uint16_t input_width, uint16_t input_height, float i_land_factor, float
 				* (max_temp - min_temp));
 			temp_temperature += ((30 * (0.5 + factor_temperature_map.grid[i])) - 30);
 			
-			if (!land_map[i]) // Sea is colder
+			if (!new_tile->land) // Sea is colder
 				temp_temperature = (temp_temperature + ((max_temp + min_temp) * 0.5 * 1))/2;
 			
-			temperature_map[i] = temp_temperature;
-			equ_temperature_map[i] = temp_temperature;
+			new_tile->temperature = temp_temperature;
+			new_tile->equ_temperature = temp_temperature;
 
-			precipitation_map = factor_precipitation_map.grid;
-			elevation_map = temp_elevation_map.grid;
+			new_tile->precipitation = factor_precipitation_map.grid[i];
+			new_tile->elevation = temp_elevation_map.grid[i];
 			
-			if (!land_map[i]) {
-				fertility_map[i] = 0;
+			if (!new_tile->land) {
+				new_tile->fertility = 0;
 			} else {
-				float c1 = (fastAbs(0.8f - precipitation_map[i])/0.8f) * (fastAbs(0.8f - precipitation_map[i])/0.8f);
-				float c2 = fastAbs(26.f - temperature_map[i])/26.f;
-				fertility_map[i] = 1.f - (c1+c2);
-				if (fertility_map[i] < 0) {
-					fertility_map[i] = 0;
+				float c1 = (fastAbs(0.8f - new_tile->precipitation)/0.8f) * (fastAbs(0.8f - new_tile->precipitation)/0.8f);
+				float c2 = fastAbs(26.f - new_tile->temperature)/26.f;
+				new_tile->fertility = 1.f - (c1+c2);
+				if (new_tile->fertility < 0) {
+					new_tile->fertility = 0;
 				}
 			}
 			
-			if (elevation_map[i] < (1 - land_factor) && temperature_map[i] < 0) {
-				terrain_map[i] = ICE;
+			if (new_tile->elevation < (1 - land_factor) && new_tile->temperature < 0) {
+				new_tile->terrain = ICE;
 				continue;
 			}
-			else if (elevation_map[i] < (1 - land_factor * 2)) {
-				terrain_map[i] = OCEAN;
+			else if (new_tile->elevation < (1 - land_factor * 2)) {
+				new_tile->terrain = OCEAN;
 				continue;
-			} else if (elevation_map[i] < (1 - land_factor * 1.2)) {
-				terrain_map[i] = SEA;
+			} else if (new_tile->elevation < (1 - land_factor * 1.2)) {
+				new_tile->terrain = SEA;
 				continue;
-			} else if (elevation_map[i] < (1 - land_factor)) {
-				terrain_map[i] = COASTAL;
+			} else if (new_tile->elevation < (1 - land_factor)) {
+				new_tile->terrain = COASTAL;
 				continue;
 			}
 			
 			// This is land now.
-			if (elevation_map[i] > 0.95) {
-				terrain_map[i] = MOUNTAIN;
+			if (new_tile->elevation > 0.95) {
+				new_tile->terrain = MOUNTAIN;
 				continue;
 			}
 			
-			if (temperature_map[i] < 0) {
-				terrain_map[i] = ARCTIC;
+			if (new_tile->temperature < 0) {
+				new_tile->terrain = ARCTIC;
 				continue;
 			}
 
-			if (precipitation_map[i] < 0.2) {
-				if (temperature_map[i] < 15)
-					terrain_map[i] = TUNDRA;
+			if (new_tile->precipitation < 0.2) {
+				if (new_tile->temperature < 15)
+					new_tile->terrain = TUNDRA;
 				else
-					terrain_map[i] = DESERT;
+					new_tile->terrain = DESERT;
 				continue;
 			}
-			if (precipitation_map[i] < 0.4) {
-				if (temperature_map[i] < 12) 
-					terrain_map[i] = TUNDRA;
+			if (new_tile->precipitation < 0.4) {
+				if (new_tile->temperature < 12) 
+					new_tile->terrain = TUNDRA;
 				else 
-					terrain_map[i] = PLAINS;
+					new_tile->terrain = PLAINS;
 				continue;
 			}
-			if (precipitation_map[i] < 0.8) {
-				if (temperature_map[i] < 8)
-					terrain_map[i] = TUNDRA;
+			if (new_tile->precipitation < 0.8) {
+				if (new_tile->temperature < 8)
+					new_tile->terrain = TUNDRA;
 				else 
-					terrain_map[i] = GRASSLAND;
+					new_tile->terrain = GRASSLAND;
 				continue;
 			}
-			if (temperature_map[i] < 25)
-				terrain_map[i] = GRASSLAND;
+			if (new_tile->temperature < 25)
+				new_tile->terrain = GRASSLAND;
 			else 
-				terrain_map[i] = JUNGLE;
+				new_tile->terrain = JUNGLE;
 		}
 	}
 }
