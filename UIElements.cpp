@@ -133,3 +133,62 @@ uint32_t InputField::getNumber() {
 	}
 	return return_value;
 }
+Page::Page(sf::Font& used_font, float new_left, float new_top, float new_width, float new_height, std::string new_title, PageType set_type, uint8_t new_font_size, Tile* set_tile) {
+	left = new_left;
+	top = new_top;
+	width = new_width;
+	height = new_height;
+	
+	font = &used_font;
+	font_size = new_font_size;
+
+	type = set_type;
+
+	tile = set_tile;
+	
+	title_text = new_title;
+	title = new sf::Text(used_font, title_text, (uint8_t)(font_size*1.5));
+	title->setPosition({left + 3.f, top - font_size*2.f});
+
+	page_sprite = new sf::RectangleShape({(float)width, (float)height});
+	page_sprite->setPosition({(float)left, (float)top});
+	page_sprite->setOutlineColor({25, 25, 25, 255});
+	page_sprite->setOutlineThickness(1);
+	page_sprite->setFillColor({140, 140, 140, 255});
+	
+	top_sprite = new sf::RectangleShape({(float)width, font_size*2.f});
+	top_sprite->setPosition({(float)left, top - font_size*2.f});
+	top_sprite->setOutlineColor({25, 25, 25, 255});
+	top_sprite->setOutlineThickness(1);
+	top_sprite->setFillColor({80, 80, 80, 255});
+
+	page_rect = page_sprite->getGlobalBounds();
+	top_rect = top_sprite->getGlobalBounds();
+}
+void Page::changePosition(sf::Vector2i change_position, uint32_t current_page_anchor_x, uint32_t current_page_anchor_y) {
+	left = change_position.x + current_page_anchor_x;
+	top = change_position.y + current_page_anchor_y + font_size*2;
+
+	page_rect.position.x = (float)left;
+	page_rect.position.y = (float)top;
+	top_rect.position.x = (float)left;
+	top_rect.position.y = top - font_size*2.f;
+
+	title->setPosition({left + 3.f, top - font_size*2.f});
+	
+	page_sprite->setPosition({(float)left, (float)top});
+	top_sprite->setPosition({(float)left, top - font_size*2.f});
+
+	for (uint16_t i = 0; i < text_sprites.size(); i++) {
+		std::get<0>(text_sprites[i])->setPosition({(float)(left + std::get<1>(text_sprites[i])), (float)(top + std::get<2>(text_sprites[i]))});
+	}
+}
+void Page::addTextString(std::string text_string, uint32_t set_x, uint32_t set_y) {
+	sf::Text* new_text = new sf::Text(*font, text_string, font_size);
+	new_text->setPosition({(float)(left + set_x), (float)(top + set_y)});
+
+	text_sprites.push_back({new_text, set_x, set_y});
+}
+void Page::updateTextString(std::string new_text_string, uint16_t index) {
+	std::get<0>(text_sprites[index])->setString(new_text_string);
+}

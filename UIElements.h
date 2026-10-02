@@ -5,6 +5,12 @@
 #include <string>
 #include <tuple>
 
+#include "Tile.h"
+
+enum Statistic {
+	TILE_TEMP,
+};
+
 enum ButtonID {
 	ADD_TO_MAP,
 
@@ -28,6 +34,16 @@ enum InputFieldType {
 	COLOR	
 };
 
+enum PageType {
+	TILE_PAGE, // Maybe TILE_PAGE_RAW and TILE_PAGE to seperate civilization details about tile.
+	CIV_PAGE,
+	REGION_PAGE,
+	CULTURE_PAGE,
+	RELIGION_PAGE,
+	CHARACTER_PAGE,
+};
+
+// This ends up just working better for single buttons rather than a group.
 struct Button {
 	sf::Sprite* button_sprite;
 	sf::FloatRect* button_collision_box;
@@ -37,7 +53,7 @@ struct Button {
 	sf::Vector2u button_size;
 	
 	ButtonID button_id;
-	
+
 	void setPosition(float input_left, float input_top) {
 		left = input_left;
 		top = input_top;
@@ -117,6 +133,40 @@ struct InputField {
 	std::tuple<uint8_t, uint8_t, uint8_t>* getColorValue(); // Gets current color value and returns.
 	void formatInput(); // Checks if user input is valid and then can modify.
 	uint32_t getNumber();
+};
+
+struct Page {
+	// TODO this should be developed into the way pages are done.
+	// If shift is done when clicking on a 'link' it makes a new page.
+	std::vector<std::tuple<sf::Text*, uint32_t, uint32_t>> text_sprites;
+	std::vector<InputField*> input_fields;
+	std::vector<Button*> stat_buttons;
+
+	std::string title_text;
+	sf::Text* title;
+
+	uint32_t left = 0;
+	uint32_t top = 0;
+	uint32_t width = 0;
+	uint32_t height = 0;
+	
+	sf::Font* font;
+	uint8_t font_size;
+	
+	sf::RectangleShape* page_sprite;
+	sf::RectangleShape* top_sprite;
+
+	sf::FloatRect top_rect;
+	sf::FloatRect page_rect;
+	
+	PageType type;
+	Tile* tile;
+
+	void changePosition(sf::Vector2i change_position, uint32_t current_page_anchor_x, uint32_t current_page_anchor_y);
+	void addTextString(std::string text_string, uint32_t set_x, uint32_t set_y);
+	void updateTextString(std::string new_text_string, uint16_t index);
+
+	Page(sf::Font& used_font, float new_left, float new_top, float new_width, float new_height, std::string new_title, PageType set_type, uint8_t new_font_size, Tile* set_tile);
 };
 
 #endif
